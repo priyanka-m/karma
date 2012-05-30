@@ -1,27 +1,4 @@
-div.badge{
-	font-family:helvetica, arial, sans-serif;
-	font-weight:bold;
-	
-}
-
-div.scoreDescription{
-	font-family:helvetica, arial, sans-serif;
-	font-weight:bold;
-	padding:5px;
-	
-}
-div.contentWrapper{
-	background-color:#f5f5f5;
-}
-div.scoreBoard{
-	width:300px;
-	height:180px;
-	float:right;
-	position:absolute;
-	top:60px;
-	right:50px;
-	background-color:#f5f5f5;
-	font-family:helvetica, arial, sans-serif;
-	font-weight:bold;
-	padding:5px;
+div.emblem{
+position:relative;
+right:10px;
 }
