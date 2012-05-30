@@ -11,10 +11,10 @@
 	}
 </style>
 <?php 
+	//guid of the user to which the widget belongs.
+	$guid = $vars['entity']->owner_guid;
 	
-	$guid = get_loggedin_userid();
-	
-	//get karma instance for loggedin user.
+	//get karma instance for user.
 	$entities = get_entities('object','karma',$guid);
 	$entity = $entities[0];
 	
