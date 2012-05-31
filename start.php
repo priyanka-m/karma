@@ -1,7 +1,7 @@
 <?php
 	function karma_init(){
 		add_widget_type('karma','karma','Find your Karma score');
-		//register cron hook to trigger function karma_cron weekly 
+		//register cron hook to trigger function karma_cron hourly 
 		register_plugin_hook('cron','hourly','karma_cron');
 	}
 	
