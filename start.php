@@ -6,7 +6,7 @@
 		register_plugin_hook('cron','weekly','karma_cron');
 	}
 	//cron function 
-	function karma_cron() {
+	function karma_cron($hook, $entity_type, $returnvalue, $params) {
 		//get all existing users on connect;
 		$entities = get_entities('user');
 		//for each user calculate karma(this is done weekly).
