@@ -1,15 +1,17 @@
 <?php
 	function karma_init(){
-		global $CONFIG;
 		add_widget_type('karma','karma','Find your Karma score');
 		//register cron hook to trigger function karma_cron weekly 
-		register_plugin_hook('cron','weekly','karma_cron');
+		register_plugin_hook('cron','hourly','karma_cron');
 	}
+	
 	//cron function 
 	function karma_cron($hook, $entity_type, $returnvalue, $params) {
+		
+		global $CONFIG;
 		//get all existing users on connect;
 		$entities = get_entities('user');
-		//for each user calculate karma(this is done weekly).
+		//for each user calculate karma(this is done hourly).
 		foreach ($entities as $entity) {
 			//email of each user 
 			$email = $entity->email;
@@ -21,6 +23,7 @@
 			array_shift($arr);
 			$max_score = 0;
 			$num_of_bugs = 0;
+			
 			//now for each bug, check its severity.
 			foreach ($arr as $line) {
 				$d = explode(',' ,$line, 8);
@@ -63,18 +66,22 @@
 			
 			//check if karma object exists for user, if it does then update it.
 			$entities = get_entities('object','karma',$guid);
-			if(isset($entities)) {
+			if(isset($entities[0])) {
 				$karma = $entities[0];
 			}
+			//when karma details do not exist
 			else {
 				$karma->description = "karma score";//TODO:score is not being used, so assign score and work out description.
 				$karma->subtype="karma";
 				$karma->access_id = ACCESS_PUBLIC;
-				$karma->owner_guid = $entity->guid;
+				$karma->owner_guid = $guid;
 			}
+			
 			$karma->title = $badge;	
 			$karma->save();
+			
 		}//end of foreach user
+		echo "karma updated";
 		return true;
 	}
 	register_elgg_event_handler('init','system','karma_init'); 

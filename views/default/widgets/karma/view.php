@@ -16,9 +16,16 @@
 	
 	//get karma instance for user.
 	$entities = get_entities('object','karma',$guid);
-	$entity = $entities[0];
 	
-	$badge = $entity->title;
+	/*isset($entities[0]) should always return true, since the plugin is enabled and the cron 
+	 * is being triggered hourly for every user, even if he uses the widget or not */ 
+	
+	if(isset($entities[0]))
+	{
+		//karma details exists, print them.	
+		$entity = $entities[0];
+		$badge = $entity->title;
+	}
 	$img_class = 'class = emblem';
 ?>
 <!-- displapy the user's badge  -->
