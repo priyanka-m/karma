@@ -19,12 +19,14 @@
 	
 	/*isset($entities[0]) should always return true, since the plugin is enabled and the cron 
 	 * is being triggered hourly for every user, even if he uses the widget or not */ 
-	
+
 	if(isset($entities[0]))
-	{
+	{	
 		//karma details exists, print them.	
 		$entity = $entities[0];
 		$badge = $entity->title;
+		$score = $entity->score;
+		$title = $badge." (".$score." Points)";
 	}
 	$img_class = 'class = emblem';
 ?>
@@ -34,7 +36,7 @@
 </div>
 <div class = "Score">
 	<?php
-	echo elgg_view_title($badge);?>
+	echo elgg_view_title($title);?>
 </div>
 
 

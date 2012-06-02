@@ -21,46 +21,48 @@
 			$xmls = file_get_contents($csv_url);
 			$arr = explode("\n",$xmls);
 			array_shift($arr);
-			$max_score = 0;
-			$num_of_bugs = 0;
+			$max_score = find_max_score();//max_score is maximum score of all users.
 			
 			//now for each bug, check its severity.
 			foreach ($arr as $line) {
 				$d = explode(',' ,$line, 8);
 				$severity = $d[1];
-				echo $severity;
-				if (strcasecmp($severity,"Blocker") == 0 ) {
+				if (strcasecmp($severity,'"Blocker"') == 0 ) {
 					$score += 10;
 				} 
-				else if (strcasecmp($severity,"Critical") == 0 ) {
+				else if (strcasecmp($severity,'"Critical"') == 0 ) {
 					$score += 8;
 				}
-				else if (strcasecmp($severity,"Major") == 0 ) {
+				else if (strcasecmp($severity,'"Major"') == 0 ) {
 					$score += 7;
 				}
-				else if (strcasecmp($severity,"Normal") == 0 ) {
+				else if (strcasecmp($severity,'"Normal"') == 0 ) {
 					$score += 5;
 				}
-				else if (strcasecmp($severity,"Minor") == 0 ) {
+				else if (strcasecmp($severity,'"Minor"') == 0 ) {
 					$score += 3;
 				}
-				else if (strcasecmp($severity,"Enhancement") == 0 ){
+				else if (strcasecmp($severity,'"Enhancement"') == 0 ){
 					$score += 2;
 				}
-				$num_of_bugs ++;
 			}
 	
-			/*For now the title Bug Squasher is assigned for securing greater than 85% of maximum
-	 *  	score, Master Ninja for securing greater than 70% but less than 85% and Novice for the rest.*/ 
-			$max_score = $num_of_bugs*10;
-			if ($max_score == 0)
+		   /* For now the title Bug squasher is assigned for securing maximum score 
+			* Bugzilla Viking is assigned for securing greater than 85% of maximum
+			* score, Master Ninja for securing greater than 70% but less than 85% and 
+			* Novice for the rest.*/ 
+			if ($max_score == 0 && $score == 0)
 				$badge = "Novice";
-			else if ($score >= 0.85*$max_score && $score < 0.7*$max_score && $max_score > 0)
-			$badge = "Bug Squasher";
-				else if ($score >=0.7*$max_score && $score < 0.5*$max_score && $max_score > 0)
-			$badge = "Master Ninja";
+			else if ($score >= $max_score && $max_score >= 0 && $score != 0)
+				$badge = "Bug Squasher";
+			else if ($score >= 0.85*$max_score && $score < $max_score && $max_score > 0)
+				$badge = "Bugzilla Viking";
+			else if ($score >=0.5*$max_score && $score < 0.7*$max_score && $max_score > 0)
+				$badge = "Master Ninja";
+			else if ($score < 0.5*$max_score || $score == 0 )
+				$badge = "Novice";
 			
-			//create an instance ElggObject classs to store karma details for ach user. 
+			//create an instance of ElggObject class to store karma details for ach user. 
 			$karma = new ElggObject();
 			$guid = $entity->guid;
 			
@@ -71,18 +73,39 @@
 			}
 			//when karma details do not exist
 			else {
-				$karma->description = "karma score";//TODO:score is not being used, so assign score and work out description.
+				$karma->description = "karma score";//TODO:work out description.
 				$karma->subtype="karma";
 				$karma->access_id = ACCESS_PUBLIC;
 				$karma->owner_guid = $guid;
 			}
 			
 			$karma->title = $badge;	
+			$karma->type = "object";
+			$karma->score = $score;
+			$karma->site_guid = $entity->site_guid;
+			$karma->container_guid = $entity->guid;
 			$karma->save();
 			
 		}//end of foreach user
-		echo "karma updated";
-		return true;
+		$result = "karma updated";
+		return $result;
 	}
+	
+	function find_max_score() {
+		//form an array of scores and call max function
+		$score = array();
+		$entities = get_entities('object','karma');
+		if(is_null($entities[0])) {
+			return 0;
+		}
+		else {
+			foreach ($entities as $entity) {
+				$score[] = $entity->score;
+			}
+			$max_score = max($score);
+			return $max_score;
+		}
+	}
+	
 	register_elgg_event_handler('init','system','karma_init'); 
 ?>
