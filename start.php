@@ -1,16 +1,21 @@
 <?php
 	function karma_init(){
 		add_widget_type('karma','karma','Find your Karma score');
+		//override permissions for the karma context
+		register_plugin_hook('permissions_check', 'all', 'karma_permissions_check');
 		//register cron hook to trigger function karma_cron hourly 
 		register_plugin_hook('cron','hourly','karma_cron');
 	}
 	
 	//cron function 
 	function karma_cron($hook, $entity_type, $returnvalue, $params) {
-		
 		global $CONFIG;
+		//get current context and set context to karma_cron so that cron has write permissions. 
+		$context = get_context();
+		set_context('karma_cron');		
 		//get all existing users on connect;
 		$entities = get_entities('user');
+		
 		//for each user calculate karma(this is done hourly).
 		foreach ($entities as $entity) {
 			//email of each user 
@@ -77,16 +82,13 @@
 				$karma->subtype="karma";
 				$karma->access_id = ACCESS_PUBLIC;
 				$karma->owner_guid = $guid;
-			}
-			
+			}	
 			$karma->title = $badge;	
-			$karma->type = "object";
 			$karma->score = $score;
-			$karma->site_guid = $entity->site_guid;
-			$karma->container_guid = $entity->guid;
 			$karma->save();
 			
 		}//end of foreach user
+		set_context($context);
 		$result = "karma updated";
 		return $result;
 	}
@@ -107,5 +109,13 @@
 		}
 	}
 	
+	//Overrides default permissions for the karma context
+	function karma_permissions_check($hook_name, $entity_type, $return_value, $parameters) {	
+		if (get_context() == 'karma_cron') {
+			return true;
+		}
+		return null;
+	} 
+	//Initialize plugin.
 	register_elgg_event_handler('init','system','karma_init'); 
 ?>
