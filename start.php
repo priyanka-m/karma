@@ -20,52 +20,9 @@
 		foreach ($entities as $entity) {
 			//email of each user 
 			$email = $entity->email;
-			$score  = 0;
-			//call to Bugzilla to return resolved bugs
-			$csv_url = "https://bugzilla.novell.com/buglist.cgi?bug_status=RESOLVED&bug_status=VERIFIED&email1=$email&emailassigned_to1=1&emailinfoprovider1=1&emailtype1=exact&query_format=advanced&title=Bug%20List&ctype=csv";
-			$xmls = file_get_contents($csv_url);
-			$arr = explode("\n",$xmls);
-			array_shift($arr);
-			$max_score = find_max_score();//max_score is maximum score of all users.
-			
-			//now for each bug, check its severity.
-			foreach ($arr as $line) {
-				$d = explode(',' ,$line, 8);
-				$severity = $d[1];
-				if (strcasecmp($severity,'"Blocker"') == 0 ) {
-					$score += 10;
-				} 
-				else if (strcasecmp($severity,'"Critical"') == 0 ) {
-					$score += 8;
-				}
-				else if (strcasecmp($severity,'"Major"') == 0 ) {
-					$score += 7;
-				}
-				else if (strcasecmp($severity,'"Normal"') == 0 ) {
-					$score += 5;
-				}
-				else if (strcasecmp($severity,'"Minor"') == 0 ) {
-					$score += 3;
-				}
-				else if (strcasecmp($severity,'"Enhancement"') == 0 ){
-					$score += 2;
-				}
-			}
-	
-		   /* For now the title Bug squasher is assigned for securing maximum score 
-			* Bugzilla Viking is assigned for securing greater than 85% of maximum
-			* score, Master Ninja for securing greater than 70% but less than 85% and 
-			* Novice for the rest.*/ 
-			if ($max_score == 0 && $score == 0)
-				$badge = "Novice";
-			else if ($score >= $max_score && $max_score >= 0 && $score != 0)
-				$badge = "Bug Squasher";
-			else if ($score >= 0.85*$max_score && $score < $max_score && $max_score > 0)
-				$badge = "Bugzilla Viking";
-			else if ($score >=0.5*$max_score && $score < 0.7*$max_score && $max_score > 0)
-				$badge = "Master Ninja";
-			else if ($score < 0.5*$max_score || $score == 0 )
-				$badge = "Novice";
+			$bugzilla_score = bugzilla_score($email);
+			$badge = $bugzilla_score[0];
+			$score = $bugzilla_score[1];
 			
 			//create an instance of ElggObject class to store karma details for ach user. 
 			$karma = new ElggObject();
@@ -109,6 +66,62 @@
 		}
 	}
 	
+	//calculates score through Bugzilla
+	function bugzilla_score($email) {
+		$score  = 0;
+		//call to Bugzilla to return resolved bugs
+		$csv_url = "https://bugzilla.novell.com/buglist.cgi?bug_status=RESOLVED&bug_status=VERIFIED&email1=$email&emailassigned_to1=1&emailinfoprovider1=1&emailtype1=exact&query_format=advanced&title=Bug%20List&ctype=csv";
+		$xmls = file_get_contents($csv_url);
+		$arr = explode("\n",$xmls);
+		array_shift($arr);
+		$max_score = find_max_score();//max_score is maximum score of all users.
+			
+		//now for each bug, check its severity.
+		foreach ($arr as $line) {
+			$d = explode(',' ,$line, 8);
+			$severity = $d[1];
+			if (strcasecmp($severity,'"Blocker"') == 0 ) {
+				$score += 10;
+			} 
+			else if (strcasecmp($severity,'"Critical"') == 0 ) {
+				$score += 8;
+			}
+			else if (strcasecmp($severity,'"Major"') == 0 ) {
+				$score += 7;
+			}
+			else if (strcasecmp($severity,'"Normal"') == 0 ) {
+				$score += 5;
+			}
+			else if (strcasecmp($severity,'"Minor"') == 0 ) {
+				$score += 3;
+			}
+			else if (strcasecmp($severity,'"Enhancement"') == 0 ){
+				$score += 2;
+			}
+		}
+	
+		/* For now the title Bug squasher is assigned for securing maximum score 
+		* Bugzilla Viking is assigned for securing greater than 85% of maximum
+		* score, Master Ninja for securing greater than 70% but less than 85% and 
+		* Novice for the rest.*/ 
+		if ($max_score == 0 && $score == 0)
+			$badge = "Novice";
+		else if ($score >= $max_score && $max_score >= 0 && $score != 0)
+			$badge = "Bug Squasher";
+		else if ($score >= 0.85*$max_score && $score < $max_score && $max_score > 0)
+			$badge = "Bugzilla Viking";
+		else if ($score >=0.5*$max_score && $score < 0.7*$max_score && $max_score > 0)
+			$badge = "Master Ninja";
+		else if ($score < 0.5*$max_score || $score == 0 )
+			$badge = "Novice";
+		
+		$bugzilla_score = array();
+		$bugzilla_score[0] = $badge;
+		$bugzilla_score[1] = $score;
+		
+		return $bugzilla_score;
+	}
+	
 	//Overrides default permissions for the karma context
 	function karma_permissions_check($hook_name, $entity_type, $return_value, $parameters) {	
 		if (get_context() == 'karma_cron') {
@@ -116,6 +129,7 @@
 		}
 		return null;
 	} 
+	
 	//Initialize plugin.
 	register_elgg_event_handler('init','system','karma_init'); 
 ?>
