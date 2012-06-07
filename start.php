@@ -10,9 +10,12 @@
 	//cron function 
 	function karma_cron($hook, $entity_type, $returnvalue, $params) {
 		global $CONFIG;
+		$total_score = 0;
 		//get current context and set context to karma_cron so that cron has write permissions. 
 		$context = get_context();
-		set_context('karma_cron');		
+		set_context('karma_cron');	
+		//allow cron for read access
+		$access = elgg_set_ignore_access(true);	
 		//get all existing users on connect;
 		$entities = get_entities('user');
 		
@@ -20,9 +23,17 @@
 		foreach ($entities as $entity) {
 			//email of each user 
 			$email = $entity->email;
+			//twitter screen name of each user
+			$twitter_screen_name = $entity->twitter;
+			
 			$bugzilla_score = bugzilla_score($email);
 			$badge = $bugzilla_score[0];
 			$score = $bugzilla_score[1];
+			
+			$twitter_score = twitter_score($twitter_screen_name);
+			
+			//total score
+			$total_score = $twitter_score + $score;
 			
 			//create an instance of ElggObject class to store karma details for ach user. 
 			$karma = new ElggObject();
@@ -41,11 +52,13 @@
 				$karma->owner_guid = $guid;
 			}	
 			$karma->title = $badge;	
-			$karma->score = $score;
+			$karma->score = $total_score;
 			$karma->save();
 			
 		}//end of foreach user
 		set_context($context);
+		elgg_set_ignore_access($access);
+
 		$result = "karma updated";
 		return $result;
 	}
@@ -66,7 +79,7 @@
 		}
 	}
 	
-	//calculates score through Bugzilla
+	//calculate score through Bugzilla
 	function bugzilla_score($email) {
 		$score  = 0;
 		//call to Bugzilla to return resolved bugs
@@ -120,6 +133,29 @@
 		$bugzilla_score[1] = $score;
 		
 		return $bugzilla_score;
+	}
+	
+	//calculates score based on user-tweets on twitter.
+	function twitter_score($twitter_screen_name) {
+		$score = 0;
+		//call to twitter, returns user's last 50 tweets.
+		$json = file_get_contents("https://api.twitter.com/1/statuses/user_timeline.json?include_entities=true&include_rts=true&screen_name=$twitter_screen_name&count=50");
+		$file = json_decode($json,'true');
+		foreach($file as $key=>$value) {
+			foreach ( $value['entities'] as $entity=>$entity_array )
+			{	
+				//look for opensuse hashtag
+				if (strcmp($entity,"hashtags") == 0 )
+				{
+					foreach ($entity_array as $index=>$hashtag)
+					{
+						if(stripos($hashtag['text'],"openSUSE") !== false)
+							$score += 2;
+					}		
+				}
+			}
+		}
+		return $score;
 	}
 	
 	//Overrides default permissions for the karma context

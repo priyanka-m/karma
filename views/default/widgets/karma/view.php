@@ -1,9 +1,9 @@
 <style type="text/css">
     img.emblem {
-		position:relative;
-		left:30px;
-		height:181px;
-		width:150px;
+		position: relative;
+		left: 30px;
+		height: 181px;
+		width: 150px;
 	}
 	div.score {
 		color: #3873B6;
@@ -37,6 +37,7 @@
 </div>
 <div class = "score">
 	<?php
-		echo $title;?>
-	</div>
+		echo $title;
+	?>
+</div>
 
