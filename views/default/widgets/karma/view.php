@@ -25,9 +25,11 @@
 	{	
 		//karma details exists, print them.	
 		$entity = $entities[0];
-		$badge = $entity->title;
+		$badge = $entity->badge;
+		$activity = $entity->activity;
 		$score = $entity->score;
-		$title = $badge." (".$score." Points)";
+		$total_score = $score[1] + $score[0];
+		$title = $badge." (".$total_score." Points)";
 	}
 	$img_class = 'class = emblem';
 ?>
@@ -38,6 +40,11 @@
 <div class = "score">
 	<?php
 		echo $title;
+		echo '<br>';
+		echo "Tweets : ".$activity[0];
+		echo '<br>';
+		echo "Bug Fixes : ".$activity[1];
+		
 	?>
 </div>
 
