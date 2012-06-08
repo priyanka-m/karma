@@ -4,7 +4,7 @@
 		//override permissions for the karma context
 		register_plugin_hook('permissions_check', 'all', 'karma_permissions_check');
 		//register cron hook to trigger function karma_cron hourly 
-		register_plugin_hook('cron','hourly','karma_cron');
+		register_plugin_hook('cron','daily','karma_cron');
 	}
 	
 	//cron function 
@@ -18,7 +18,7 @@
 		//get all existing users on connect;
 		$entities = get_entities('user');
 		
-		//for each user assign karma score(this is done hourly).
+		//for each user assign karma score(this is done daily).
 		foreach ($entities as $entity) {
 			//email of each user 
 			$email = $entity->email;
