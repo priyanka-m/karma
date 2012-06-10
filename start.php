@@ -1,6 +1,6 @@
 <?php
 	function karma_init(){
-		add_widget_type('karma','karma','Find your Karma score');
+		add_widget_type('karma','Karma','Find your Karma score');
 		//override permissions for the karma context
 		register_plugin_hook('permissions_check', 'all', 'karma_permissions_check');
 		//register cron hook to trigger function karma_cron daily 
