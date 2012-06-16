@@ -124,7 +124,7 @@
 		//if the user has not confirmed his email id on bugzilla, file_get_contents returns a page, 
 		//not a list of bugs.
 		if ($score == 0) {
-				$num_of_bugs_fixed = 0;
+			$num_of_bugs_fixed = 0;
 		}
 		
 		$bugzilla_score = array();
