@@ -15,69 +15,85 @@
 		set_context('karma_cron');	
 		//allow cron for read access
 		$access = elgg_set_ignore_access(true);	
-		//get all existing users on connect;
-		$entities = get_entities('user');
+		//construct the params array to pass to elgg_get_entities
+		$params = array('types' => array('user'),'limit' => 0,'count' => TRUE);
+		//number of users registered on the site.
+		$numusers = elgg_get_entities($params);
+		//divide by 5 to get number of times to run the for loop(we will get_entities() for 5 users at a time).
+		$limit = ceil($numusers/5);
+		$offset = 0;
 		
-		//for each user assign karma score(this is done daily).
-		foreach ($entities as $entity) {
-			//guid of each user
-			$guid = $entity->guid;
-			//email of each user 
-			$email = $entity->email;
-			//twitter screen name of each user
-			$twitter_screen_name = $entity->twitter;
+		for ($i=1; $i<=$limit; $i++) {
+			//get 5 users on connect;
+			$entities = get_entities('user', "", 0, "", 5, $offset);
+		
+			//for each user assign karma score(this is done daily).
+			foreach ($entities as $entity) {
+				//guid of each user
+				$guid = $entity->guid;
+				//email of each user 
+				$email = $entity->email;
+				//twitter screen name of each user
+				$twitter_screen_name = $entity->twitter;
 			
-			//bugzilla score
-			$bugzilla = bugzilla_score($email);
-			$bugzilla_score = $bugzilla[0];
-			$num_of_bugs_fixed = $bugzilla[1];
+				//bugzilla score
+				$bugzilla = bugzilla_score($email);
+				$bugzilla_score = $bugzilla[0];
+				$num_of_bugs_fixed = $bugzilla[1];
 			
-			//twitter score
-			$twitter = twitter_score($twitter_screen_name,$guid);
-			$twitter_score = $twitter[0];
-			$num_of_tweets = $twitter[1];
+				//twitter score
+				$twitter = twitter_score($twitter_screen_name,$guid);
+				$twitter_score = $twitter[0];
+				$num_of_tweets = $twitter[1];
 			
-			//planet opensuse score
-			$planet_opensuse = planet_opensuse_score($entity->blog,$guid);
-			$planet_opensuse_score = $planet_opensuse[0];
-			$num_of_posts = $planet_opensuse[1];
+				//planet opensuse score
+				$planet_opensuse = planet_opensuse_score($entity->blog,$guid);
+				$planet_opensuse_score = $planet_opensuse[0];
+				$num_of_posts = $planet_opensuse[1];
 			
-			
-			//create an instance of ElggObject class to store karma score for each user. 
-			$karma = new ElggObject();
-			
-			//check if karma object exists for user, if it does then update it.
-			$entities = get_entities('object','karma',$guid);
-			if(isset($entities[0])) {
-				$karma = $entities[0];
-				$old_activity = $karma->activity;
-				$old_marketing_score = $karma->marketing_score;
-				$karma->developer_score = $bugzilla_score;
-				$karma->marketing_score = array($old_marketing_score[0] + $twitter_score, $old_marketing_score[1] + $planet_opensuse_score);
-				$karma->activity = array($num_of_tweets + $old_activity[0],$num_of_bugs_fixed,$num_of_posts + $old_activity[2]);	
-			}
-			//when karma details do not exist before
-			else {
-				$karma->title = $entity->name;
-				$karma->description = "Karma Score";
-				$karma->subtype="karma";
-				$karma->marketing_score = array($twitter_score,$planet_opensuse_score);
-				$karma->developer_score = $bugzilla_score;
-				$karma->activity = array($num_of_tweets,$num_of_bugs_fixed,$num_of_posts);
-				$karma->access_id = ACCESS_PUBLIC;
-				$karma->owner_guid = $guid;
-			}	
-			$karma->last_updated = time();
-			$karma->save();	
-		}//end of foreach user
+				//check if karma object exists for user, if it does then update it.
+				$entities = get_entities('object','karma',$guid);
+				if(isset($entities[0])) {
+					$karma = $entities[0];
+					$old_activity = $karma->activity;
+					$old_marketing_score = $karma->marketing_score;
+					$karma->developer_score = $bugzilla_score;
+					$karma->marketing_score = array($old_marketing_score[0] + $twitter_score, $old_marketing_score[1] + $planet_opensuse_score);
+					$karma->activity = array($num_of_tweets + $old_activity[0],$num_of_bugs_fixed,$num_of_posts + $old_activity[2]);	
+				}
+				//when karma details do not exist before
+				else {
+					//create an instance of ElggObject class to store karma score for each user. 
+					$karma = new ElggObject();
+					$karma->title = $entity->name;
+					$karma->description = "Karma Score";
+					$karma->subtype="karma";
+					$karma->marketing_score = array($twitter_score,$planet_opensuse_score);
+					$karma->developer_score = $bugzilla_score;
+					$karma->activity = array($num_of_tweets,$num_of_bugs_fixed,$num_of_posts);
+					$karma->access_id = ACCESS_PUBLIC;
+					$karma->owner_guid = $guid;
+				}	
+				$karma->last_updated = time();
+				$karma->save();	
+			}//end of foreach user
+			$offset = $offset + 5;
+		}//end of for
+		
+		//find max score needed for assigning badges.
+		$max_score = find_max_score();
 		
 		//after calculating score for all users, assign badges to each.
-		$karma_entities = get_entities('object','karma');
-		foreach ($karma_entities as $karma_entity) {
-			//send each user's score to assign badge.
-			$badge = assign_badge($karma_entity->developer_score,$karma_entity->marketing_score);
-			$karma_entity->badge = $badge;
-			$karma_entity->save();
+		$offset = 0;
+		for ($i=1; $i<=$limit; $i++) {
+			$karma_entities = get_entities('object','karma',0, "", 5, $offset);
+			foreach ($karma_entities as $karma_entity) {
+				//send each user's score to assign badge.
+				$badge = assign_badge($karma_entity->developer_score,$karma_entity->marketing_score,$max_score);
+				$karma_entity->badge = $badge;
+				$karma_entity->save();
+			}
+			$offset = $offset + 5;
 		}
 		//set context and acsess rights back to what they were originally.
 		set_context($context);
@@ -138,7 +154,7 @@
 	function twitter_score($twitter_screen_name,$guid) {
 		$score = 0;
 		$num_of_tweets = 0;
-		//call to twitter, returns user's last 50 tweets.
+		//call to twitter, returns user's last 5 tweets.
 		$json = file_get_contents("https://api.twitter.com/1/statuses/user_timeline.json?include_entities=true&include_rts=true&screen_name=$twitter_screen_name&count=5");
 		$file = json_decode($json,'true');
 		foreach ($file as $key=>$value) {
@@ -225,13 +241,12 @@
 	}
 	
 	//assigns badge given marketing and developer score
-	function assign_badge($developer,$marketing) {
+	function assign_badge($developer,$marketing,$max_score) {
 		
 		$bugzilla_score = $developer;
 		$twitter_score = $marketing[0];
 		$planet_opensuse_score = $marketing[1];
 		
-		$max_score = find_max_score();
 		$max_developer = $max_score[0];
 		$max_marketing = $max_score[1];
 		
