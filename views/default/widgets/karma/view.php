@@ -14,6 +14,17 @@
 <?php 
 	//guid of the user to which the widget belongs.
 	$guid = $vars['entity']->owner_guid;
+	$user_entity = get_entity($guid);
+	
+	//find the time passed since karma was last updated for current user.
+	$last_updated = $user_entity->karma_update_time;
+	$current_time = time();
+	$time_diff_in_hours = round(abs($current_time - $last_updated) / 3600,2);
+	
+	//if time passed since last update is more than one hour, then update on widget view.
+	if ($time_diff_in_hours > 1 ) {
+		karma_update_on_widet_view($guid);
+	}
 	
 	//get karma instance for user.
 	$entities = get_entities('object','karma',$guid);
@@ -33,6 +44,7 @@
 		$title = $badge." (".$total_score." Points)";
 	}
 	$img_class = 'class = emblem';
+	
 ?>
 <!-- displapy the user's badge  -->
 <div class = "emblem">

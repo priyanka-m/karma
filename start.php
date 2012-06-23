@@ -3,8 +3,8 @@
 		add_widget_type('karma','Karma','Find your Karma score');
 		//override permissions for the karma context
 		register_plugin_hook('permissions_check', 'all', 'karma_permissions_check');
-		//register cron hook to trigger function karma_cron daily 
-		register_plugin_hook('cron','daily','karma_cron');
+		//register cron hook to trigger function karma_cron every five minutes. 
+		register_plugin_hook('cron','fiveminute','karma_cron');
 	}
 	
 	//cron function 
@@ -15,86 +15,88 @@
 		set_context('karma_cron');	
 		//allow cron for read access
 		$access = elgg_set_ignore_access(true);	
-		//construct the params array to pass to elgg_get_entities
-		$params = array('types' => array('user'),'limit' => 0,'count' => TRUE);
-		//number of users registered on the site.
-		$numusers = elgg_get_entities($params);
-		//divide by 5 to get number of times to run the for loop(we will get_entities() for 5 users at a time).
-		$limit = ceil($numusers/5);
-		$offset = 0;
 		
-		for ($i=1; $i<=$limit; $i++) {
-			//get 5 users on connect;
-			$entities = get_entities('user', "", 0, "", 5, $offset);
+		//add metadata karma_update_time to all user entities
+		$entities = elgg_get_entities(array('types' => 'user','limit' => false));
+		foreach ($entities as $entity) {
+			if (!isset($entity->karma_update_time)) {
+				$entity->karma_update_time = strtotime('2008-03-01 13:34');//any random time in the past.
+				$entity->save();
+			}
+		}
+		//get 5 user entities who have been longest without updating.
+		$entities = elgg_get_entities_from_metadata(array(
+					'types' => 'user',
+					'limit' => '5',
+					'metadata_names' => 'karma_update_time',
+					'order_by_metadata' => array(
+					'name' => 'karma_update_time',
+					'direction' => 'ASC',
+					'as' => integer) ));
 		
-			//for each user assign karma score(this is done daily).
-			foreach ($entities as $entity) {
-				//guid of each user
-				$guid = $entity->guid;
-				//email of each user 
-				$email = $entity->email;
-				//twitter screen name of each user
-				$twitter_screen_name = $entity->twitter;
+		//for each user assign karma score(this is done every five minutes).
+		foreach ($entities as $entity) {
+			//guid of each user
+			$guid = $entity->guid;
+			//email of each user 
+			$email = $entity->email;
+			//twitter screen name of each user
+			$twitter_screen_name = $entity->twitter;
 			
-				//bugzilla score
-				$bugzilla = bugzilla_score($email);
-				$bugzilla_score = $bugzilla[0];
-				$num_of_bugs_fixed = $bugzilla[1];
+			//bugzilla score
+			$bugzilla = bugzilla_score($email);
+			$bugzilla_score = $bugzilla[0];
+			$num_of_bugs_fixed = $bugzilla[1];
 			
-				//twitter score
-				$twitter = twitter_score($twitter_screen_name,$guid);
-				$twitter_score = $twitter[0];
-				$num_of_tweets = $twitter[1];
+			//twitter score
+			$twitter = twitter_score($twitter_screen_name,$guid);
+			$twitter_score = $twitter[0];
+			$num_of_tweets = $twitter[1];
 			
-				//planet opensuse score
-				$planet_opensuse = planet_opensuse_score($entity->blog,$guid);
-				$planet_opensuse_score = $planet_opensuse[0];
-				$num_of_posts = $planet_opensuse[1];
+			//planet opensuse score
+			$planet_opensuse = planet_opensuse_score($entity->blog,$guid);
+			$planet_opensuse_score = $planet_opensuse[0];
+			$num_of_posts = $planet_opensuse[1];
 			
-				//check if karma object exists for user, if it does then update it.
-				$entities = get_entities('object','karma',$guid);
-				if(isset($entities[0])) {
-					$karma = $entities[0];
-					$old_activity = $karma->activity;
-					$old_marketing_score = $karma->marketing_score;
-					$karma->developer_score = $bugzilla_score;
-					$karma->marketing_score = array($old_marketing_score[0] + $twitter_score, $old_marketing_score[1] + $planet_opensuse_score);
-					$karma->activity = array($num_of_tweets + $old_activity[0],$num_of_bugs_fixed,$num_of_posts + $old_activity[2]);	
-				}
-				//when karma details do not exist before
-				else {
-					//create an instance of ElggObject class to store karma score for each user. 
-					$karma = new ElggObject();
-					$karma->title = $entity->name;
-					$karma->description = "Karma Score";
-					$karma->subtype="karma";
-					$karma->marketing_score = array($twitter_score,$planet_opensuse_score);
-					$karma->developer_score = $bugzilla_score;
-					$karma->activity = array($num_of_tweets,$num_of_bugs_fixed,$num_of_posts);
-					$karma->access_id = ACCESS_PUBLIC;
-					$karma->owner_guid = $guid;
-				}	
-				$karma->last_updated = time();
-				$karma->save();	
-			}//end of foreach user
-			$offset = $offset + 5;
-		}//end of for
-		
+			//check if karma object exists for user, if it does then update it.
+			$entities = get_entities('object','karma',$guid);
+			if(isset($entities[0])) {
+				$karma = $entities[0];
+				$old_activity = $karma->activity;
+				$old_marketing_score = $karma->marketing_score;
+				$karma->developer_score = $bugzilla_score;
+				$karma->marketing_score = array($old_marketing_score[0] + $twitter_score, $old_marketing_score[1] + $planet_opensuse_score);
+				$karma->activity = array($num_of_tweets + $old_activity[0],$num_of_bugs_fixed,$num_of_posts + $old_activity[2]);	
+			}
+			//when karma details do not exist before
+			else {
+				//create an instance of ElggObject class to store karma score for each user. 
+				$karma = new ElggObject();
+				$karma->title = $entity->name;
+				$karma->description = "Karma Score";
+				$karma->subtype="karma";
+				$karma->marketing_score = array($twitter_score,$planet_opensuse_score);
+				$karma->developer_score = $bugzilla_score;
+				$karma->activity = array($num_of_tweets,$num_of_bugs_fixed,$num_of_posts);
+				$karma->access_id = ACCESS_PUBLIC;
+				$karma->owner_guid = $guid;
+			}	
+			$karma->save();	
+			$entity->karma_update_time = time();
+			$entity->save();
+		}//end of foreach user
+			
 		//find max score needed for assigning badges.
 		$max_score = find_max_score();
 		
 		//after calculating score for all users, assign badges to each.
-		$offset = 0;
-		for ($i=1; $i<=$limit; $i++) {
-			$karma_entities = get_entities('object','karma',0, "", 5, $offset);
-			foreach ($karma_entities as $karma_entity) {
+			$entities = elgg_get_entities(array('types' => 'object','subtype'=>'karma','limit' => false));
+			foreach ($entities as $karma_entity) {
 				//send each user's score to assign badge.
 				$badge = assign_badge($karma_entity->developer_score,$karma_entity->marketing_score,$max_score);
 				$karma_entity->badge = $badge;
 				$karma_entity->save();
 			}
-			$offset = $offset + 5;
-		}
 		//set context and acsess rights back to what they were originally.
 		set_context($context);
 		elgg_set_ignore_access($access);
@@ -204,7 +206,7 @@
 	function find_max_score() {
 		$bugzilla_scores = array();
 		$marketing_scores = array();
-		$entities = get_entities('object','karma');
+		$entities = elgg_get_entities(array('types' => 'object','subtype'=>'karma','limit' => false));
 		if(is_null($entities[0])) {
 			return 0;
 		}
@@ -226,10 +228,9 @@
 	//checks if time of publishing is greater than last update.
 	function check_date($date,$guid) {
 		$timestamp = strtotime($date);
-		$entities = get_entities('object','karma',$guid);
-		if(isset($entities[0])) {
-			$karma = $entities[0];
-			$last_updated = $karma->last_updated;
+		$entity = get_entity($guid);
+		if(isset($entity)) {
+			$last_updated = $entity->karma_update_time;
 			if ($timestamp > $last_updated)
 				return true;
 			else
@@ -278,6 +279,57 @@
 		}
 		return $badge;
 	}	
+	
+	//function to update karma for current logged in user, on widget view.
+	function karma_update_on_widet_view($guid) {
+		$context = get_context();
+		set_context('karma_update_for_current_user');	
+		//allow cron for read access
+		$access = elgg_set_ignore_access(true);
+		
+		$current_user = get_entity($guid);
+		$email = $current_user->email;
+		$twitter_screen_name = $current_user->twitter;
+		$blog_url = $current_user->blog;
+		
+		//bugzilla score
+		$bugzilla = bugzilla_score($email);
+		$bugzilla_score = $bugzilla[0];
+		$num_of_bugs_fixed = $bugzilla[1];
+			
+		//twitter score
+		$twitter = twitter_score($twitter_screen_name,$guid);
+		$twitter_score = $twitter[0];
+		$num_of_tweets = $twitter[1];
+			
+		//planet opensuse score
+		$planet_opensuse = planet_opensuse_score($blog_url,$guid);
+		$planet_opensuse_score = $planet_opensuse[0];
+		$num_of_posts = $planet_opensuse[1];
+			
+		//check if karma object exists for user, if it does then update it.
+		$entities = get_entities('object','karma',$guid);
+		$karma = $entities[0];
+		$old_activity = $karma->activity;
+		$old_marketing_score = $karma->marketing_score;
+		$karma->developer_score = $bugzilla_score;
+		$karma->marketing_score = array($old_marketing_score[0] + $twitter_score, $old_marketing_score[1] + $planet_opensuse_score);
+		$karma->activity = array($num_of_tweets + $old_activity[0],$num_of_bugs_fixed,$num_of_posts + $old_activity[2]);	
+		$karma->save();	
+		
+		$current_user->karma_update_time = time();
+		$current_user->save();
+		
+		$max_score = find_max_score();
+		
+		$badge = assign_badge($karma->developer_score,$karma->marketing_score,$max_score);
+		$karma->badge = $badge;
+		$karma->save();
+		
+		//set context and acsess rights back to what they were originally.
+		set_context($context);
+		elgg_set_ignore_access($access);
+	}
 	
 	//Overrides default permissions for the karma context
 	function karma_permissions_check($hook_name, $entity_type, $return_value, $parameters) {	
