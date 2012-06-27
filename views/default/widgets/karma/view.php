@@ -23,26 +23,20 @@
 	
 	//if time passed since last update is more than one hour, then update on widget view.
 	if ($time_diff_in_hours > 1 ) {
-		karma_update_on_widet_view($guid);
+		karma_update($guid);
 	}
 	
 	//get karma instance for user.
 	$entities = get_entities('object','karma',$guid);
 	
-	/*isset($entities[0]) should always return true, since the plugin is enabled and the cron 
-	 * is being triggered hourly for every user, even if he uses the widget or not */ 
-
-	if (isset($entities[0]))
-	{	
-		//karma details exists, print them.	
-		$entity = $entities[0];
-		$badge = $entity->badge;
-		$activity = $entity->activity;
-		$developer_score = $entity->developer_score;
-		$marketing_score = $entity->marketing_score;
-		$total_score = $marketing_score[0] + $marketing_score[1] + $developer_score;
-		$title = $badge." (".$total_score." Points)";
-	}
+	//karma details exists, print them.	
+	$entity = $entities[0];
+	$badge = $entity->badge;
+	$activity = $entity->activity;
+	$developer_score = $entity->developer_score;
+	$marketing_score = $entity->marketing_score;
+	$total_score = $marketing_score[0] + $marketing_score[1] + $developer_score;
+	$title = $badge." (".$total_score." Points)";
 	$img_class = 'class = emblem';
 	
 ?>
