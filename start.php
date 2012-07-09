@@ -10,7 +10,10 @@
 	//cron function 
 	function karma_cron($hook, $entity_type, $returnvalue, $params) {
 		global $CONFIG;
-		
+		$context = get_context();
+		set_context('karma_update');	
+		//allow karma_update for read access
+		$access = elgg_set_ignore_access(true);
 		//get 5 user entities who have been longest without updating.
 		$entities = elgg_get_entities_from_metadata(array(
 					'types' => 'user',
@@ -21,17 +24,22 @@
 					'direction' => 'ASC',
 					'as' => integer) ));
 		
+		//call function to update karma score for latest updated packages.
+		build_service_update();
+	
 		//for each user update karma score(this is done every five minutes).
 		foreach ($entities as $entity) {
-			karma_update($entity->guid);
+			karma_update($entity->guid,'0','0');
 		}
-
+		
+		set_context($context);
+		elgg_set_ignore_access($access);
 		$result = "karma updated";
 		return $result;
 	}
 	
 	//function to update karma for each user, also on widget view.
-	function karma_update($guid) {
+	function karma_update($guid, $obs_score , $commit ) {
 		//get current context and set context to karma_update_for_user so that karma has write permissions.
 		$context = get_context();
 		set_context('karma_update_for_user');	
@@ -57,14 +65,14 @@
 		//planet opensuse score
 		$planet_opensuse = planet_opensuse_score($blog_url,$guid);
 		$planet_opensuse_score = $planet_opensuse[0];
-		$num_of_posts = $planet_opensuse[1];
+		$num_of_posts = $planet_opensuse[1];	
 			
 		//check if karma object exists for user, if it does then update it.
 		$entities = get_entities('object','karma',$guid);
-		
 		if(isset($entities[0])) {
 			$karma = $entities[0];
 			$old_activity = $karma->activity;
+			$old_developer_score = $karma->developer_score;
 			$old_marketing_score = $karma->marketing_score;
 		}
 		//when karma details do not exist before
@@ -72,25 +80,26 @@
 			//create an instance of ElggObject class to store karma score for each user. 
 			$karma = new ElggObject();
 			
-			$karma->title = $current_user->name;
+			$karma->title = $user->name;
 			$karma->description = "Karma Score";
 			$karma->subtype="karma";
 			$karma->access_id = ACCESS_PUBLIC;
 			$karma->owner_guid = $guid;
 			
+			$old_developer_score = array(0,0);
 			$old_marketing_score = array(0,0);
-			$old_activity = array(0,0,0);
+			$old_activity = array(0,0,0,0);
 		}
 		//update marketing and developer score.
-		$karma->developer_score = $bugzilla_score;
+		$karma->developer_score = array($bugzilla_score , $obs_score + $old_developer_score[1]);
 		$karma->marketing_score = array($old_marketing_score[0] + $twitter_score, $old_marketing_score[1] + $planet_opensuse_score);
-		$karma->activity = array($num_of_tweets + $old_activity[0],$num_of_bugs_fixed,$num_of_posts + $old_activity[2]);	
+		$karma->activity = array($num_of_tweets + $old_activity[0],$num_of_bugs_fixed,$num_of_posts + $old_activity[2], $commit + $old_activity[3]);	
 		
 		//pass developer and marketing score to check if current user score is max score, and return max score.
 		$max_score = calculate_max_score($karma->developer_score,$karma->marketing_score);
 		
 		//assign badge to user with the help of user score and max score.
-		$badge = assign_badge($bugzilla_score,$karma->marketing_score,$max_score);
+		$badge = assign_badge($karma->developer_score,$karma->marketing_score,$max_score);
 		$karma->badge = $badge;
 		$karma->save();
 		
@@ -200,10 +209,120 @@
 		return $planet_opensuse;
 	}
 	
+	//function to update karma score on making commits in Build service.
+	function build_service_update() {
+		//call the build service api to get latest updated packages.
+		$url = "https://api.opensuse.org/statistics/latest_updated?limit=10";
+		$data = curl_request_to_api($url);
+		//Use the DOMDocument class to represent the fetched document in XML.
+		$dom = new DOMDocument;
+		$dom->loadXML($data); 
+		$xpath = new DOMXPath($dom);
+		$result_packages = $xpath->query('/latest_updated/package');
+		foreach($result_packages as $r) {
+			$score = 0;
+			$commits = 0;
+			$project = $r->getAttribute('project');
+			$package = $r->getAttribute('name');
+			//call the build service api to fetch source files of the package.
+			$url = "https://api.opensuse.org/source/".$project."/".$package;
+			$source_files = curl_request_to_api($url);
+			$dom_doc = new DOMDocument;
+			$dom_doc->loadXML($source_files); 
+			$xp = new DOMXPath($dom_doc);
+			//read the list to source files to find the .changes file.
+			$result_source_files = $xp->query('/directory/entry');
+			//emails of users who are to be rewarded for their commits.
+			$array_emails = array();
+			foreach ($result_source_files as $result_source_file) {
+				if (strpos ( $result_source_file->getAttribute('name'),".changes" )) {
+					$name_of_changes_file = $result_source_file->getAttribute('name');
+					//cal the build api to read the changes file.
+					$url = "https://api.opensuse.org/source/".$project."/".$package."/".$name_of_changes_file;
+					$data = curl_request_to_api($url);
+					//break all file into separate results.
+					$commit_details = explode("-------------------------------------------------------------------",$data);
+					foreach ($commit_details as  $commit_detail) {
+						/*process changes file to fetch email of users who have made commits 
+						 * after the last update. */
+						$changes = process_changes_file($commit_detail);
+						if(!is_null($changes))
+							$arr[] = $changes; //put the returned emails in an array.
+					}
+					/*use array_count_values to return how many times each user has made a commit.
+					 * (A user can make commits more than one time). results are of the form 
+					 * arr['email_id'] => number of occurences after the last update in the changes file  */
+					$count = array_count_values($arr);
+					foreach($count as $key=>$value) {
+						$users = get_user_by_email($key);
+						$user = $users[0];
+						$score = $value*5; //multiply number of commits by 5 to return score.
+						karma_update($user->guid,$score,$value); //update karma for that user.
+					}
+				}
+			}
+		}
+	}
+	
+	//function to make cURL GET requests to the OBS API.
+	function curl_request_to_api($url) {
+		$headers = array("Authorization: Basic cHJpeWFua2FfbToxMjNhYmNkY29kZXIxMjM=");
+		$ch = curl_init($url); 
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+		curl_setopt($ch, CURLOPT_TIMEOUT, 60); 
+		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);               
+		curl_setopt($ch,CURLOPT_HEADER,0);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, FALSE); 
+		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, FALSE);  
+		$data = curl_exec($ch); 
+		if (curl_errno($ch)) 
+			print "Error: " . curl_error($ch);
+		else 
+			curl_close($ch);
+		return $data;
+	}
+	
+	//function to return the position of nth occurence of needle in the haystack.
+	function nthstrpos($haystack, $needle, $nth) {
+		$place = -1;
+		for ($i = 0; $i < $nth; $i++) 
+			$place = strpos($haystack, $needle, $place + 1);
+		return $place;
+	}
+	
+	/*process the changes file to fetch emails of those users who have made commits 
+	 * after their respective last update time. */
+	function process_changes_file($commit_detail) {
+		$pos = strpos($commit_detail,"-");
+		if($pos == 0)
+			$pos_ = nthstrpos($commit_detail,"-",3);
+		else	
+			$pos_ = nthstrpos($commit_detail, "-", 2);
+		if($pos_ == -1 )
+			$pos_ = nthstrpos($commit_detail,"+",1);
+		$len = $pos_ + 1;
+		$str = substr($commit_detail,0,$len);
+		$str = ltrim($str,"-");
+		$line = explode("-",$str);
+		$time = $line[0];
+		$email = $line[1];
+		$users = get_user_by_email($email);
+		$user = $users[0];
+		if(isset($user)) {
+			$guid = $user->guid;
+			$check_date = check_date($time,$guid);
+		}
+		//check if time is greater than last update only then return the email.
+		if($check_date == true)
+			return $email;
+		else
+			return null;
+	}
+	
 	//finding maximum developer and marketing score.
 	function calculate_max_score($developer_score,$marketing_score) {
 		$marketing_score = $marketing_score[0] + $marketing_score[1];
-		
+		$developer_score = $developer_score[0] + $developer_score[1];
 		//get maximum karma score object.
 		$entities = elgg_get_entities(array('type'=>'object', 'subtype'=>'max_karma'));
 		
@@ -244,8 +363,8 @@
 	
 	//assigns badge given marketing and developer score
 	function assign_badge($developer,$marketing,$max_score) {
-		
-		$bugzilla_score = $developer;
+		$bugzilla_score = $developer[0];
+		$build_service_score = $developer_score[1];
 		$twitter_score = $marketing[0];
 		$planet_opensuse_score = $marketing[1];
 		
@@ -253,19 +372,23 @@
 		$max_marketing = $max_score[1];
 		
 		$marketing_score = $twitter_score + $planet_opensuse_score;
-		if($bugzilla_score == 0 && $planet_opensuse_score == 0 && $twitter_score == 0 )
+		$developer_score = $bugzilla_score + $build_service_score;
+		if($bugzilla_score == 0 && $planet_opensuse_score == 0 && $twitter_score == 0 && $build_service_score == 0 )
 			$badge = "Novice";
 
-		else if ($bugzilla_score >= $marketing_score) {
+		else if ($developer_score >= $marketing_score) {
 			if ($bugzilla_score >= 0.75*$max_developer && $bugzilla_score <= $max_developer)
 				$badge = "SUSE Samurai";
-			else if ($bugzilla_score >=0.5*$max_developer && $bugzilla_score < 0.7*$max_developer)
-				$badge = "Bug Buster";
-			else if ($bugzilla_score < 0.5*$max_developer && $bugzilla_score > 0 )
+			else if ($developer_score >=0.5*$max_developer && $bugzilla_score < 0.75*$max_developer) {
+				if ($bugzilla_score > $build_service_score )
+					$badge = "Bug Buster";
+				else
+					$badge = "Build Superhero";
+			}
+			else if ($developer_score < 0.5*$max_developer && $bugzilla_score > 0 )
 				$badge = "Notable Endeavor";
 		}
-	
-		else if ($marketing_score > $bugzilla_score) {
+		else if ($marketing_score > $developer_score) {
 			if ($marketing_score >= 0.75*$max_marketing && $marketing_score <= $max_marketing)
 				$badge = "SUSE Herald";
 			else if ($marketing_score >= 0.5*$max_marketing && $marketing_score < 0.75*$max_marketing)
@@ -289,6 +412,8 @@
 		return null;
 	} 
 	
+	 //register to action for allowing giving 'KUDOS to other connect users'.
+	register_action("karma/kudos", false, $CONFIG->pluginspath . "karma/actions/kudos.php");
 	//Initialize plugin.
 	register_elgg_event_handler('init','system','karma_init'); 
 ?>
