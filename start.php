@@ -364,7 +364,7 @@
 	//assigns badge given marketing and developer score
 	function assign_badge($developer,$marketing,$max_score) {
 		$bugzilla_score = $developer[0];
-		$build_service_score = $developer_score[1];
+		$build_service_score = $developer[1];
 		$twitter_score = $marketing[0];
 		$planet_opensuse_score = $marketing[1];
 		
@@ -377,20 +377,28 @@
 			$badge = "Novice";
 
 		else if ($developer_score >= $marketing_score) {
-			if ($bugzilla_score >= 0.75*$max_developer && $bugzilla_score <= $max_developer)
+			if ($developer_score == $max_developer)
+				$badge = "Numero Uno";
+			else if ($developer_score >= 0.85*$max_developer && $developer_score <= $max_developer)
+				$badge = "Elite Stallion";
+			else if ($developer_score >= 0.75*$max_developer && $developer_score < 0.85*$max_developer)
 				$badge = "SUSE Samurai";
-			else if ($developer_score >=0.5*$max_developer && $bugzilla_score < 0.75*$max_developer) {
+			else if ($developer_score >=0.5*$max_developer && $developer_score < 0.75*$max_developer) 
+				$badge = "Citizen Patrol";
+			else if ($developer_score >= 0.40*$max_developer && $developer_score < 0.5*$max_developer){
 				if ($bugzilla_score > $build_service_score )
 					$badge = "Bug Buster";
 				else
 					$badge = "Build Superhero";
 			}
-			else if ($developer_score < 0.5*$max_developer && $bugzilla_score > 0 )
+			else if ($developer_score < 0.40*$max_developer && $developer_score > 0 )
 				$badge = "Notable Endeavor";
 		}
 		else if ($marketing_score > $developer_score) {
-			if ($marketing_score >= 0.75*$max_marketing && $marketing_score <= $max_marketing)
+			if ($marketing_score == $max_marketing)
 				$badge = "SUSE Herald";
+			else if ($marketing_score >= 0.75*$max_marketing && $marketing_score < $max_marketing)
+				$badge = "Autobiographer";
 			else if ($marketing_score >= 0.5*$max_marketing && $marketing_score < 0.75*$max_marketing)
 				$badge = "Enthusiast";
 			else {
@@ -411,6 +419,85 @@
 		}
 		return null;
 	} 
+	//calculate number of kudos a user needs to gain a higher star than the currently currently has.
+	function kudos_needed_for_higher_star($kudos){
+		$star = floor($kudos/20);
+		$kudos_needed = ($star+1)*20 - $kudos;
+		return $kudos_needed;
+	}
+	
+	/* calcalute how much percentage of the maximum score is the current user score so that 
+	 * user has idea of how much he needs to increase his score to be the maximum scorer. */
+	function calculate_percent_of_score($developer_score,$marketing_score) {
+		$context = get_context();
+		set_context('percentage calculation');	
+		$access = elgg_set_ignore_access(true);
+		
+		$developer_score = $developer_score[0]+$developer_score[1];
+		$marketing_score = $marketing_score[0]+$marketing_score[1];
+		$max_score = calculate_max_score($developer_score,$marketing_score);
+				
+		$max_developer = $max_score[0];
+		$max_marketing = $max_score[1];
+		
+		//calculate percentage for whichever score is higher.
+		if ($developer_score > $marketing_score) {
+			$perc = $developer_score/$max_developer;
+		}
+		else {
+			$perc = $marketing_score/$max_marketing;
+		}
+		
+		return $perc;
+		
+		set_context($context);
+		elgg_set_ignore_access($access);
+	}
+	
+	//function that returns a message, which explains why a certain badge was awarded to the current user.
+	function load_badge_suggestion($badge) {
+			if($badge == "Twitteratti")
+				$message = "Your badge suggests that Tweeting has been your only significant
+				contribution to the openSUSE society. We strongly believe that you could do more and have fun!";
+			else if ($badge == "Blog-o-Manic")
+				$message = "Your badge suggests that blogging has been your only significant 
+				contribution to the openSUSE society";
+			else if ($badge == "Enthusiast")
+				$message = "Your badge suggests that you a quite a marketier, you blog and 
+				tweet quite often, but we feel you should do more of this. Have fun!";
+			else if ($badge == "Autobiographer")
+				$message = "Your badge suggests that you are an avid blogger or twitteratti, 
+				we would really like you to keep up the great work and have fun!";	
+			else if ($badge == "SUSE Herald")
+				$message = "Your badge suggests that you are a top-scorer. You have the maximum
+				marketing Karma and we are proud of you!";
+			else if ($badge == "Notable Endeavor")
+				$message = "Your badge suggests that you are involved more with developer works
+				under openSUSE, but your contribution needs to be more significant. Keep up the good
+				work and have fun!";
+			else if ($badge == "Build Superhero")
+				$message = "Your badge suggests that you have been working with various 
+				distributions on build service, we think that is great! But we also feel you
+				can contribute more to openSUSE to make your contribution much more significant";
+			else if ($badge == "Bug Buster")
+				$message = "Your badge suggests that you have been fixing bugs on Novell's Bugzilla
+				,we think that is great! But we also feel you can contribute more to openSUSE to make your 
+				contribution more signifcant";
+			else if ($badge == "Citizen Patrol")
+				$message = "Your badge suggests that you are quite a developer! You fix bugs or make quite many build service
+				commits, and we encourage you to do more of this, have fun!";
+			else if ($badge == "SUSE Samurai")
+				$message = "Your badge suggests that you significantly contribute to openSUSE, in terms of
+				fixing bugs and working with distributions on build service. We are proud of you and we feel,
+				that you do more of this and have fun! ";
+			else if ($badge == "Elite Stallion")
+				$message = "Your badge suggests that you are a core developer, we salute you and encourage you to 
+				keep up the good work and have fun!";
+			else if ($badge == "Numero Uno")
+				$message = "Your badge suggests that you are a top-scorer. You have the maximum developer karma
+				and we are proud of you. Keep up the good work and have fun!";
+			return $message;
+	}
 	
 	 //register to action for allowing giving 'KUDOS to other connect users'.
 	register_action("karma/kudos", false, $CONFIG->pluginspath . "karma/actions/kudos.php");
