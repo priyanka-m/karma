@@ -47,9 +47,8 @@
 	}
 	
 	.badge_suggestion {
-		color:#690;
+		color:#069;
 	}
-	
 </style>
 
 <?php 
@@ -125,36 +124,38 @@
 	if($guid == $vars['user']->guid) {
 		echo '<div class = "search_listing">';
 			echo '<div id  = "score_details">';
-				echo '<b>'."Score Details".'</b>';
+				echo '<b><u>'."Score Details".'</u></b>';
 				//display why a certain badge was awarded to the user.
 				echo '<div class = "badge_suggestion">';
 					$suggestion = load_badge_suggestion($badge);
 					echo $suggestion;	
 				echo '</div>';
 				//diplay activity 
-				echo "Bug Fixes : ".$activity[1];
 				echo '<br>';
-				echo "Build Service Commits : ".$activity[3];
+				echo "<b>Bug Fixes</b> : ".$activity[1];
 				echo '<br>';
-				echo "Planet OpenSUSE posts : ".$activity[2];	
+				echo "<b>Build Service Commits</b> : ".$activity[3];
 				echo '<br>';
-				echo "Tweets : ".$activity[0];
+				echo "<b>Planet OpenSUSE posts</b> : ".$activity[2];	
+				echo '<br>';
+				echo "<b>Tweets</b> : ".$activity[0];
 				echo '<br>';
 				//display what percentage of maximum score is the current user's score.
 				$perc = round(calculate_percent_of_score($developer_score,$marketing_score),2);
 				if($perc != 1) {
-					echo "<b>Your score is ".($perc*100)."% of the Max score.</b>";
+					echo "Your score is ".($perc*100)."% of the Max score.";
 					echo '<br>';
 				}
+				echo '<br>';
 				//display kudos
 				if(!is_null($kudos)) {
-					echo "Kudos - ".$kudos;
+					echo "<b>Kudos - </b>".$kudos;
 					echo '<br>';
 				}	
 				//display number of kudos needed for a higher star.
 				$kudos_needed = kudos_needed_for_higher_star($kudos);
-				echo "<b>You still need ".$kudos_needed." kudos to gain a higher star for your profile.</b>";
-
+				echo "You need ".$kudos_needed." kudos to be awarded with a star.";
+				echo '<br>';
 			echo '</div>';
 		echo '</div>';
 	}
