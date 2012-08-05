@@ -18,6 +18,8 @@
 		color: #3873B6;
 		font-weight: bold;
 		text-align:center;
+		border-bottom: 1px solid #DDD;
+		padding:5px 0 0 0;
 	}
 	
 	b {
@@ -44,11 +46,13 @@
 	
 	#score_details {
 		font-family:helvetica, arial, sans-serif;
+		margin-bottom:1em;
 	}
 	
 	.badge_suggestion {
 		color:#069;
 	}
+	
 </style>
 
 <?php 
@@ -75,8 +79,9 @@
 	$activity = $entity->activity;
 	$developer_score = $entity->developer_score;
 	$marketing_score = $entity->marketing_score;
+	$wiki_score = $entity->wiki_score;
 	$total_score = $marketing_score[0] + $marketing_score[1] + $developer_score[0] + $developer_score[1];
-	$title = $badge." (".$total_score." Points)";
+	$title = $badge." - ".$total_score." Points";
 	$img_class = 'class = emblem';
 	
 ?>
@@ -90,6 +95,8 @@
 <?php 
 				echo elgg_view('input/securitytoken'); 
 				echo elgg_view('input/hidden',array('internalname' => 'guid','value' => $karma_entity_guid));
+				echo elgg_view('input/hidden',array('internalname' => 'user_guid','value' => $guid));
+				echo elgg_view('input/hidden',array('internalname' => 'url','value' => $vars['url']));
 				echo elgg_view('input/hidden',array('internalname' => 'kudos','value' => $kudos));
 				echo elgg_view('input/submit', array('value' => elgg_echo('Extend your Kudos') ,'class' => elgg_echo('kudos_button'),'borderbrush'=>elgg_echo('transparent'), 'borderthickness'=>elgg_echo('0')));
 ?>
@@ -115,16 +122,17 @@
 <div class = "score">
 	<?php
 		echo '<br>';
-		echo '<u>'.$title.'</u>';
+		echo $title;
 		echo '<br>';
 	?>
 </div>
+
 <?php
 	//display this information only if the widget belongs to the current logged in user.
 	if($guid == $vars['user']->guid) {
 		echo '<div class = "search_listing">';
 			echo '<div id  = "score_details">';
-				echo '<b><u>'."Score Details".'</u></b>';
+				echo '<b style = "color:#690;">'."Score Details".'</b>';
 				//display why a certain badge was awarded to the user.
 				echo '<div class = "badge_suggestion">';
 					$suggestion = load_badge_suggestion($badge);
@@ -136,9 +144,11 @@
 				echo '<br>';
 				echo "<b>Build Service Commits</b> : ".$activity[3];
 				echo '<br>';
-				echo "<b>Planet OpenSUSE posts</b> : ".$activity[2];	
+				echo "<b>Planet openSUSE posts</b> : ".$activity[2];	
 				echo '<br>';
 				echo "<b>Tweets</b> : ".$activity[0];
+				echo '<br>';
+				echo "<b>Wiki Edits</b> :".$activity[4];
 				echo '<br>';
 				//display what percentage of maximum score is the current user's score.
 				$perc = round(calculate_percent_of_score($developer_score,$marketing_score),2);
@@ -159,4 +169,5 @@
 			echo '</div>';
 		echo '</div>';
 	}
+	
 ?>

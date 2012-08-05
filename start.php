@@ -32,8 +32,10 @@
 			karma_update($entity->guid,'0','0');
 		}
 		
+		//set context and read access rights back to what they were originally.
 		set_context($context);
 		elgg_set_ignore_access($access);
+		
 		$result = "karma updated";
 		return $result;
 	}
@@ -51,6 +53,7 @@
 		$email = $user->email;
 		$twitter_screen_name = $user->twitter;
 		$blog_url = $user->blog;
+		$username = $user->username;
 		
 		//bugzilla score
 		$bugzilla = bugzilla_score($email);
@@ -65,7 +68,12 @@
 		//planet opensuse score
 		$planet_opensuse = planet_opensuse_score($blog_url,$guid);
 		$planet_opensuse_score = $planet_opensuse[0];
-		$num_of_posts = $planet_opensuse[1];	
+		$num_of_posts = $planet_opensuse[1];
+		
+		//openSUSE wiki score
+		$wiki = wiki_score($username,$guid);
+		$wiki_score = $wiki[0];
+		$num_of_edits = $wiki[1];	
 			
 		//check if karma object exists for user, if it does then update it.
 		$entities = get_entities('object','karma',$guid);
@@ -74,6 +82,7 @@
 			$old_activity = $karma->activity;
 			$old_developer_score = $karma->developer_score;
 			$old_marketing_score = $karma->marketing_score;
+			$old_wiki_score = $karma->wiki_score;
 		}
 		//when karma details do not exist before
 		else {
@@ -88,12 +97,14 @@
 			
 			$old_developer_score = array(0,0);
 			$old_marketing_score = array(0,0);
-			$old_activity = array(0,0,0,0);
+			$old_wiki_score = 0;
+			$old_activity = array(0,0,0,0,0);
 		}
 		//update marketing and developer score.
+		$karma->wiki_score = $wiki_score;
 		$karma->developer_score = array($bugzilla_score , $obs_score + $old_developer_score[1]);
 		$karma->marketing_score = array($old_marketing_score[0] + $twitter_score, $old_marketing_score[1] + $planet_opensuse_score);
-		$karma->activity = array($num_of_tweets + $old_activity[0],$num_of_bugs_fixed,$num_of_posts + $old_activity[2], $commit + $old_activity[3]);	
+		$karma->activity = array($num_of_tweets + $old_activity[0],$num_of_bugs_fixed,$num_of_posts + $old_activity[2], $commit + $old_activity[3], $num_of_edits + $old_activity[4]);	
 		
 		//pass developer and marketing score to check if current user score is max score, and return max score.
 		$max_score = calculate_max_score($karma->developer_score,$karma->marketing_score);
@@ -319,6 +330,31 @@
 			return null;
 	}
 	
+	//openSUSE wiki score
+	function wiki_score($username,$guid) {
+		$score = 0;
+		$num_of_edits = 0;
+		$url = "http://en.opensuse.org/index.php?title=Special:Contributions/".$username."&feed=atom&deletedOnly=&limit=10&target=".$username."&topOnly=&year=&month=";
+		$dom_doc = new DOMDocument();
+		$html_file = file_get_contents($url);
+		$dom_doc->loadHTML( $html_file );
+		// Get all references to <updated> tag
+		$tags_updated = $dom_doc->getElementsByTagName('updated');
+		// Extract text value and replace with something else
+		foreach($tags_updated as $tag) {
+			$tag_value = $tag->nodeValue;
+			// get translation of tag_value
+			$time = str_replace("T"," ",str_replace("Z","",$tag_value));
+			$check = check_date($time,$guid);
+			if ($check == true) {
+				$score += 2;
+				$num_of_edits ++;
+			}
+		}
+		$wiki_score = array($score,$num_of_edits);
+		return $wiki_score;
+	}
+	
 	//finding maximum developer and marketing score.
 	function calculate_max_score($developer_score,$marketing_score) {
 		$marketing_score = $marketing_score[0] + $marketing_score[1];
@@ -498,6 +534,35 @@
 				and we are proud of you. Keep up the good work and have fun!";
 			return $message;
 	}
+	
+	//function that provides karma details on being called by the api.
+	function karma_details($username) {
+		$user = get_user_by_username($username);
+		
+		if ($user instanceof ElggUser) {
+			$guid = $user->guid;
+			$karma_update_time = date("d-m-Y H:i:s",$user->karma_update_time);
+		
+			$entities = get_entities('object','karma',$guid);	
+			$entity = $entities[0];
+			$badge = $entity->badge;
+			$developer_score = $entity->developer_score;
+			$marketing_score = $entity->marketing_score;
+			$wiki_score = $entity->wiki_score;
+		
+			return array("badge"=>$badge,"developer_score"=>array("bugzilla_score"=>$developer_score[0],"build_service_score"=>$developer_score[1]),
+			"marketing_score"=>array("twitter_score"=>$marketing_score[0],"planet_opensuse_score"=>$marketing_score[1]),
+			"wiki_score" => $wiki_score,"karma_last_update"=>$karma_update_time);
+		}
+		else
+			return "incorrect username";
+	}
+	
+	//function to expose the karma_details method to the Connect API, requires api authentication.
+	expose_function("karma.details", 
+                "karma_details", 
+                 array("username" => array('type' => 'string')), 'A method which fetches karma details of a user', 'GET',
+                 false, false);
 	
 	 //register to action for allowing giving 'KUDOS to other connect users'.
 	register_action("karma/kudos", false, $CONFIG->pluginspath . "karma/actions/kudos.php");

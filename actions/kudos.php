@@ -5,4 +5,5 @@
 	$entity = get_entity($guid);
 	$entity->kudos = $kudos_given;
 	$entity->save();
+	forward(REFERER);
 ?>
