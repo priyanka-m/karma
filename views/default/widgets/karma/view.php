@@ -95,8 +95,6 @@
 <?php 
 				echo elgg_view('input/securitytoken'); 
 				echo elgg_view('input/hidden',array('internalname' => 'guid','value' => $karma_entity_guid));
-				echo elgg_view('input/hidden',array('internalname' => 'user_guid','value' => $guid));
-				echo elgg_view('input/hidden',array('internalname' => 'url','value' => $vars['url']));
 				echo elgg_view('input/hidden',array('internalname' => 'kudos','value' => $kudos));
 				echo elgg_view('input/submit', array('value' => elgg_echo('Extend your Kudos') ,'class' => elgg_echo('kudos_button'),'borderbrush'=>elgg_echo('transparent'), 'borderthickness'=>elgg_echo('0')));
 ?>
@@ -128,8 +126,7 @@
 </div>
 
 <?php
-	//display this information only if the widget belongs to the current logged in user.
-	if($guid == $vars['user']->guid) {
+	//display score details.
 		echo '<div class = "search_listing">';
 			echo '<div id  = "score_details">';
 				echo '<b style = "color:#690;">'."Score Details".'</b>';
@@ -168,6 +165,5 @@
 				echo '<br>';
 			echo '</div>';
 		echo '</div>';
-	}
 	
 ?>
