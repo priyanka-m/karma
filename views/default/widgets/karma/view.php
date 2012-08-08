@@ -88,6 +88,8 @@
 	<!-- display the kudos button -->
 	<div id = "kudos">
 <?php 
+		//in a day a user can be extended kudos only max_kudos number of times.
+		$max_kudos = max(2,$total_score/500);
 		$kudos = $entity->kudos;
 		if($guid != $vars['user']->guid) {
 ?>
@@ -95,6 +97,7 @@
 <?php 
 				echo elgg_view('input/securitytoken'); 
 				echo elgg_view('input/hidden',array('internalname' => 'guid','value' => $karma_entity_guid));
+				echo elgg_view('input/hidden',array('internalname' => 'max_kudos','value' => $max_kudos));
 				echo elgg_view('input/hidden',array('internalname' => 'kudos','value' => $kudos));
 				echo elgg_view('input/submit', array('value' => elgg_echo('Extend your Kudos') ,'class' => elgg_echo('kudos_button'),'borderbrush'=>elgg_echo('transparent'), 'borderthickness'=>elgg_echo('0')));
 ?>
@@ -104,11 +107,11 @@
 		//for every 20 kudos a gold star is awarded.
 		$gold_stars = floor($kudos/20);
 		//display stars.
-		for ($i=1;$i<=$gold_stars;$i++) {
-			echo '<img class = "star" src="'.elgg_format_url($vars['url']."mod/karma/default_icons/star.jpg").'" border="0"/>';
-		}
 		for($j=1;$j<=5-$gold_stars;$j++) {
 			echo '<img class = "star" src="'.elgg_format_url($vars['url']."mod/karma/default_icons/grey.jpg").'" border="0"/>';
+		}
+		for ($i=1;$i<=$gold_stars;$i++) {
+			echo '<img class = "star" src="'.elgg_format_url($vars['url']."mod/karma/default_icons/star.jpg").'" border="0"/>';
 		}
 ?>
 	</div>
@@ -137,18 +140,18 @@
 				echo '</div>';
 				//diplay activity 
 				echo '<br>';
-				echo "<b>Bug Fixes</b> : ".$activity[1];
+				echo "<b>Bug Fixes</b>: ".$activity[1];
 				echo '<br>';
-				echo "<b>Build Service Commits</b> : ".$activity[3];
+				echo "<b>Build Service Commits</b>: ".$activity[3];
 				echo '<br>';
-				echo "<b>Planet openSUSE posts</b> : ".$activity[2];	
+				echo "<b>Planet openSUSE posts</b>: ".$activity[2];	
 				echo '<br>';
-				echo "<b>Tweets</b> : ".$activity[0];
+				echo "<b>Tweets</b>: ".$activity[0];
 				echo '<br>';
-				echo "<b>Wiki Edits</b> :".$activity[4];
+				echo "<b>Wiki Edits</b>: ".$activity[4];
 				echo '<br>';
 				//display what percentage of maximum score is the current user's score.
-				$perc = round(calculate_percent_of_score($developer_score,$marketing_score),2);
+				$perc = round(calculate_percent_of_score($developer_score,$marketing_score),4);
 				if($perc != 1) {
 					echo "Your score is ".($perc*100)."% of the Max score.";
 					echo '<br>';
@@ -156,7 +159,7 @@
 				echo '<br>';
 				//display kudos
 				if(!is_null($kudos)) {
-					echo "<b>Kudos - </b>".$kudos;
+					echo "<b>Kudos: </b>".$kudos;
 					echo '<br>';
 				}	
 				//display number of kudos needed for a higher star.
@@ -165,5 +168,4 @@
 				echo '<br>';
 			echo '</div>';
 		echo '</div>';
-	
 ?>
