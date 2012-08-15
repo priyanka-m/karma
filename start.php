@@ -332,12 +332,13 @@
 	
 	//openSUSE wiki score
 	function wiki_score($username,$guid) {
-		$score = 0;
+		$total_score = 0;
 		$total_num_of_edits = 0;
 		//brute-forced from http://i18n.opensuse.org/stats/trunk/index.php
 		$locales = array('cs','cz','de','el','en','es','fi','fr','hu','it','ja','nl','pl','pt','ru','sv','tr','vi','zh');
 
 		foreach ($locales as $locale) {
+			$score = 0;
 			$num_of_edits = 0;
 			$url = "http://".$locale."opensuse.org/index.php?title=Special:Contributions/".$username."&feed=atom&deletedOnly=&limit=10&target=".$username."&topOnly=&year=&month=";
 			$dom_doc = new DOMDocument();
@@ -358,11 +359,12 @@
 				}
 			}
 
+			$total_score += $score;
 			$total_num_of_edits += $num_of_edits;
 
 		} // end locales loop
 
-		$wiki_score = array($score,$total_num_of_edits);
+		$wiki_score = array($total_score,$total_num_of_edits);
 		return $wiki_score;
 	}
 	
