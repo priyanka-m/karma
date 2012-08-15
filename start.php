@@ -31,6 +31,8 @@
 		foreach ($entities as $entity) {
 			karma_update($entity->guid,'0','0');
 		}
+		//find user ranks based on overall score.
+		karma_rank();
 		
 		//set context and read access rights back to what they were originally.
 		set_context($context);
@@ -101,16 +103,17 @@
 			$old_activity = array(0,0,0,0,0);
 		}
 		//update marketing and developer score.
-		$karma->wiki_score = $wiki_score;
+		$karma->wiki_score = $old_wiki_score + $wiki_score;
 		$karma->developer_score = array($bugzilla_score , $obs_score + $old_developer_score[1]);
 		$karma->marketing_score = array($old_marketing_score[0] + $twitter_score, $old_marketing_score[1] + $planet_opensuse_score);
 		$karma->activity = array($num_of_tweets + $old_activity[0],$num_of_bugs_fixed,$num_of_posts + $old_activity[2], $commit + $old_activity[3], $num_of_edits + $old_activity[4]);	
+		$karma->total_score = $karma->developer_score[0] + $karma->developer_score[1] + $karma->marketing_score[0] + $karma->marketing_score[1] + $wiki_score + $karma->kudos;
 		
 		//pass developer and marketing score to check if current user score is max score, and return max score.
 		$max_score = calculate_max_score($karma->developer_score,$karma->marketing_score);
 		
 		//assign badge to user with the help of user score and max score.
-		$badge = assign_badge($karma->developer_score,$karma->marketing_score,$max_score);
+		$badge = assign_badge($karma->developer_score,$karma->marketing_score,$karma->wiki_score,$max_score);
 		$karma->badge = $badge;
 		$karma->save();
 		
@@ -351,6 +354,12 @@
 				$num_of_edits ++;
 			}
 		}
+		if ($score > 0 && $num_of_edits > 0)
+		{
+			$score -= 2;
+			$num_of_edits -= 1;
+		}
+		
 		$wiki_score = array($score,$num_of_edits);
 		return $wiki_score;
 	}
@@ -398,7 +407,7 @@
 	}
 	
 	//assigns badge given marketing and developer score
-	function assign_badge($developer,$marketing,$max_score) {
+	function assign_badge($developer,$marketing,$wiki_score,$max_score) {
 		$bugzilla_score = $developer[0];
 		$build_service_score = $developer[1];
 		$twitter_score = $marketing[0];
@@ -409,10 +418,10 @@
 		
 		$marketing_score = $twitter_score + $planet_opensuse_score;
 		$developer_score = $bugzilla_score + $build_service_score;
-		if($bugzilla_score == 0 && $planet_opensuse_score == 0 && $twitter_score == 0 && $build_service_score == 0 )
+		if($bugzilla_score == 0 && $planet_opensuse_score == 0 && $twitter_score == 0 && $build_service_score == 0 && $wiki_score == 0)
 			$badge = "Novice";
 
-		else if ($developer_score >= $marketing_score) {
+		else if ($developer_score >= $marketing_score && $developer_score >= $wiki_score) {
 			if ($developer_score == $max_developer)
 				$badge = "Numero Uno";
 			else if ($developer_score >= 0.85*$max_developer && $developer_score <= $max_developer)
@@ -430,7 +439,7 @@
 			else if ($developer_score < 0.40*$max_developer && $developer_score > 0 )
 				$badge = "Notable Endeavor";
 		}
-		else if ($marketing_score > $developer_score) {
+		else if ($marketing_score > $developer_score && $marketing_score > $wiki_score) {
 			if ($marketing_score == $max_marketing)
 				$badge = "SUSE Herald";
 			else if ($marketing_score >= 0.75*$max_marketing && $marketing_score < $max_marketing)
@@ -443,10 +452,41 @@
 				else
 					$badge = "Twitteratti";
 			}
-
 		}
+		else 
+			$badge = "Strunk & White";
 		return $badge;
 	}	
+	
+	//function to calculate user ranks based on total score.
+	function karma_rank() {
+		//get all karma entities.
+		$entities = elgg_get_entities(array('types' => 'object',
+					'subtypes' => 'karma',
+					'limit' => FALSE ));
+		//incase for certain users total score has not been calculated, do it now to avoid errors.
+		foreach ($entities as $entity) {
+			$entity->total_score = $entity->developer_score[0] + $entity->developer_score[1] + $entity->marketing_score[0] + $entity->marketing_score[1] + $entity->wiki_score + $entity->kudos;
+			$entity->save();
+		}	
+				
+		//fetch all karma entities in descending order of their karma total score.		
+		$entities = elgg_get_entities_from_metadata(array('types' => 'object', 
+					'subtypes' => 'karma' , 
+					'limit' => FALSE,
+					'metadata_names' => 'total_score',
+					'order_by_metadata' => array(
+					'name' => 'total_score',
+					'direction' => 'DESC',
+					'as' => integer) ));
+		//starting from the karma entity at the top assign rank '1' and so on.
+		$rank = 1;
+		foreach ($entities as $entity) {
+			$entity->rank =$rank;
+			$entity->save();
+			$rank += 1; 
+		}
+	}
 	
 	//Overrides default permissions for the karma context
 	function karma_permissions_check($hook_name, $entity_type, $return_value, $parameters) {	
@@ -455,12 +495,6 @@
 		}
 		return null;
 	} 
-	//calculate number of kudos a user needs to gain a higher star than the currently currently has.
-	function kudos_needed_for_higher_star($kudos){
-		$star = floor($kudos/20);
-		$kudos_needed = ($star+1)*20 - $kudos;
-		return $kudos_needed;
-	}
 	
 	/* calcalute how much percentage of the maximum score is the current user score so that 
 	 * user has idea of how much he needs to increase his score to be the maximum scorer. */
@@ -532,8 +566,15 @@
 			else if ($badge == "Numero Uno")
 				$message = "Your badge suggests that you are a top-scorer. You have the maximum developer karma
 				and we are proud of you. Keep up the good work and have fun!";
+			else if ($badge == "Novice")
+				$message = "Your badge suggests that you have not had any contribution to openSUSE so far.
+				We think you can do great work for the community. Work  hard and have fun!";
+			else if ($badge == "Strunk & White")
+				$message = "Your badge suggests that you have contributed to openSUSE wiki. We encourage you
+				to carry on with the great work you're doing and have fun!";
 			return $message;
 	}
+	
 	
 	//function that provides karma details on being called by the api.
 	function karma_details($username) {

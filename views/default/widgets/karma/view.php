@@ -8,10 +8,8 @@
 		border:1px solid #f5f5f5;
 	}
 	
-	img.star {
+	.rank {
 		float:right;
-		height:15px;
-		width:15px;
 	}
 	
 	div.score {
@@ -53,6 +51,11 @@
 		color:#069;
 	}
 	
+	#kudos_senders {
+		color: #3873B6;
+		font-weight: bold;
+		text-align:justified;
+	}
 </style>
 
 <?php 
@@ -79,16 +82,20 @@
 	$activity = $entity->activity;
 	$developer_score = $entity->developer_score;
 	$marketing_score = $entity->marketing_score;
-	$wiki_score = $entity->wiki_score;
-	$total_score = $marketing_score[0] + $marketing_score[1] + $developer_score[0] + $developer_score[1];
-	$title = $badge." - ".$total_score." Points";
+	$title = $badge." - ".$entity->total_score." Points";
 	$img_class = 'class = emblem';
 	
 ?>
 	<!-- display the kudos button -->
 	<div id = "kudos">
 <?php 
-		//in a day a user can be extended kudos only max_kudos number of times.
+		//in a day a user can extended kudos only max_kudos number of times.
+		$loggedin_userid = get_loggedin_userid();
+		$loggedin_karma_entity = get_entities('object','karma',$loggedin_userid);
+		$loggedin_karma_entity = $loggedin_karma_entity[0];
+		$total_score = $loggedin_karma_entity->total_score;
+		$loggedin_karma_guid = $loggedin_karma_entity->guid;
+		
 		$max_kudos = max(2,$total_score/500);
 		$kudos = $entity->kudos;
 		if($guid != $vars['user']->guid) {
@@ -97,22 +104,17 @@
 <?php 
 				echo elgg_view('input/securitytoken'); 
 				echo elgg_view('input/hidden',array('internalname' => 'guid','value' => $karma_entity_guid));
+				echo elgg_view('input/hidden',array('internalname' => 'loggedin_karma_guid','value' => $loggedin_karma_guid));
 				echo elgg_view('input/hidden',array('internalname' => 'max_kudos','value' => $max_kudos));
 				echo elgg_view('input/hidden',array('internalname' => 'kudos','value' => $kudos));
+				echo elgg_view('input/hidden',array('internalname' => 'kudos_giver','value' => $vars['user']->name));
 				echo elgg_view('input/submit', array('value' => elgg_echo('Extend your Kudos') ,'class' => elgg_echo('kudos_button'),'borderbrush'=>elgg_echo('transparent'), 'borderthickness'=>elgg_echo('0')));
 ?>
 			</form>
 <?php
 		}
-		//for every 20 kudos a gold star is awarded.
-		$gold_stars = floor($kudos/20);
-		//display stars.
-		for($j=1;$j<=5-$gold_stars;$j++) {
-			echo '<img class = "star" src="'.elgg_format_url($vars['url']."mod/karma/default_icons/grey.jpg").'" border="0"/>';
-		}
-		for ($i=1;$i<=$gold_stars;$i++) {
-			echo '<img class = "star" src="'.elgg_format_url($vars['url']."mod/karma/default_icons/star.jpg").'" border="0"/>';
-		}
+		//display rank of the user, based on overall score.
+		echo '<div class = "rank"><i>'."Rank ".'</i><b>'.$entity->rank.'</b></div>';
 ?>
 	</div>
 	
@@ -161,11 +163,23 @@
 				if(!is_null($kudos)) {
 					echo "<b>Kudos: </b>".$kudos;
 					echo '<br>';
+					//display who all extended kudos to the current logged in user.
+					echo "<b>Kudos Given By: </b>";
+					echo '<br>';
+					if (is_array($entity->kudos_sender)) {
+						//display only recent 10 or less results.
+						$senders = $entity->kudos_sender;
+						$size = count($senders);
+						$limit = min(10,$size);
+						for ($i = 0; $i < $limit; $i++) {
+							echo '<a id = "kudos_senders" href = "'.$vars['url']."pg/profile/".$senders[$size - $i - 1].'">'.$senders[$size - $i - 1].'</a>'." | ";
+						}
+						if (($size - 10) > 0 )
+							echo "And ".($size - 10)." more";
+					}
+					else if( !is_array($entity->kudos_sender) && !is_null($entity->kudos_sender))
+					 echo '<a id = "kudos_senders" href = "'.$vars['url']."pg/profile/".$entity->kudos_sender.'">'.$entity->kudos_sender.'</a>';
 				}	
-				//display number of kudos needed for a higher star.
-				$kudos_needed = kudos_needed_for_higher_star($kudos);
-				echo "You need ".$kudos_needed." kudos to be awarded with a star.";
-				echo '<br>';
 			echo '</div>';
 		echo '</div>';
 ?>
