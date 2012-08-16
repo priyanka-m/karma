@@ -44,13 +44,15 @@
 	
 	//function to update karma for each user, also on widget view.
 	function karma_update($guid, $obs_score , $commit ) {
-		//get current context and set context to karma_update_for_user so that karma has write permissions.
+		/*get current context and set context to karma_update_for_user 
+		 * so that karma has write permissions.*/
 		$context = get_context();
 		set_context('karma_update_for_user');	
 		//allow karma_update for read access
 		$access = elgg_set_ignore_access(true);
 		
-		//get the user entity and then fetch username, twitter screen name, email id and blog url.
+		/*get the user entity and then fetch username, twitter screen name, 
+		 * email id and blog url.*/
 		$user = get_entity($guid);
 		$email = $user->email;
 		$twitter_screen_name = $user->twitter;
@@ -335,11 +337,12 @@
 	
 	//openSUSE wiki score
 	function wiki_score($username,$guid) {
-		$score = 0;
+		$total_score = 0;
 		$total_num_of_edits = 0;
 		//brute-forced from http://i18n.opensuse.org/stats/trunk/index.php
 		$locales = array('cs','cz','de','el','en','es','fi','fr','hu','it','ja','nl','pl','pt','ru','sv','tr','vi','zh');
 		foreach ($locales as $locale) {
+			$score = 0;
 			$num_of_edits = 0;
 			$url = "http://$locale.opensuse.org/index.php?title=Special:Contributions/".$username."&feed=atom&deletedOnly=&limit=10&target=".$username."&topOnly=&year=&month=";
 			$dom_doc = new DOMDocument();
@@ -358,14 +361,15 @@
 					$num_of_edits ++;
 				}
 			}
+			//subtract on account of an extra update tag outside all entry tags, which is the feed's 'updated' tag.
+			if ($num_of_edits > 0 && $score > 0) {
+				$num_of_edits -= 1;
+				$score -= 2;
+			}
+			
+			$total_score += $score;
 			$total_num_of_edits += $num_of_edits;
 		} // end locales loop
-		
-		//subtract on account of an extra update tag outside all entry tags, which is the feed's 'updated' tag.
-		if ($total_num_of_edits > 0 && $score > 0) {
-			$total_num_of_edits -= 1;
-			$score -= 2;
-		}
 		
 		$wiki_score = array($score,$total_num_of_edits);
 		return $wiki_score;
