@@ -18,7 +18,7 @@
 	$last_kudos_awarded = $loggedin_karma_entity->last_kudos_awarded;
 	//check if kudos extenders array exists or not or has a single record.
 	if (!is_array($entity->kudos_sender)) {
-		if(is_null($entity->kudos_sender))
+		if (is_null($entity->kudos_sender))
 			$senders = array();
 		else
 			$senders = array($entity->kudos_sender);
@@ -27,22 +27,23 @@
 		$senders = $entity->kudos_sender;
 	
 	//if the first kudo was awarded 24 hours back, create a new last_awarded kudos array.
-	if(abs(time() - $last_kudos_awarded[0])/86400 > 1) {
-		//create array with max_kudos number of elements so that no more than max_kudos , 
-		//can be awarded to the user.
+	if (abs(time() - $last_kudos_awarded[0])/86400 > 1) {
+		/*create array with max_kudos number of elements so that no more 
+		 * than max_kudos, can be awarded to the user.*/
 		$last_kudos_awarded = array_fill(0, $max_kudos, 0);
 	}
 	//find if array has space for time values so that a kudos can be extended.
 	$index = array_search('0',$last_kudos_awarded);
 	
-	//if max_kudos number of kudos have not yet been extended then allow to do so, else not.
-	if(is_int($index)) {
+	/*if max_kudos number of kudos have not yet been extended then allow 
+	 * to do so, else not.*/
+	if (is_int($index)) {
 		$last_kudos_awarded[$index] = time();
 		$kudos = $kudos + 1;
 		//check if the current kudos extender is in the list of kudos extenders or not.
-		$search = array_search($sender,$senders);
+		$search = array_search($sender, $senders);
 		//if not then make an entry.
-		if(!is_int($search))
+		if (!is_int($search))
 			$senders[] = $sender;
 	}
 	//entry of the time at which kudos was awarded.

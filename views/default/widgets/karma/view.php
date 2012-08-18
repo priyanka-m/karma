@@ -70,10 +70,10 @@
 	
 	//if time passed since last update is more than one hour, then update on widget view.
 	if ($time_diff_in_hours > 1 ) {
-		karma_update($guid,'0','0');
+		karma_update($guid, '0', '0');
 	}
 	//get karma instance for user.
-	$entities = get_entities('object','karma',$guid);
+	$entities = get_entities('object', 'karma', $guid);
 	
 	//karma details exists, print them.	
 	$entity = $entities[0];
@@ -91,24 +91,32 @@
 <?php 
 		//in a day a user can extended kudos only max_kudos number of times.
 		$loggedin_userid = get_loggedin_userid();
-		$loggedin_karma_entity = get_entities('object','karma',$loggedin_userid);
+		$loggedin_karma_entity = get_entities('object', 'karma', $loggedin_userid);
 		$loggedin_karma_entity = $loggedin_karma_entity[0];
 		$total_score = $loggedin_karma_entity->total_score;
 		$loggedin_karma_guid = $loggedin_karma_entity->guid;
 		
-		$max_kudos = max(2,$total_score/500);
+		$max_kudos = max(2, $total_score/500);
 		$kudos = $entity->kudos;
-		if($guid != $vars['user']->guid) {
+		if ($guid != $vars['user']->guid) {
 ?>
 			<form action = "<?php echo $vars['url']; ?>action/karma/kudos" method="post">
 <?php 
 				echo elgg_view('input/securitytoken'); 
-				echo elgg_view('input/hidden',array('internalname' => 'guid','value' => $karma_entity_guid));
-				echo elgg_view('input/hidden',array('internalname' => 'loggedin_karma_guid','value' => $loggedin_karma_guid));
-				echo elgg_view('input/hidden',array('internalname' => 'max_kudos','value' => $max_kudos));
-				echo elgg_view('input/hidden',array('internalname' => 'kudos','value' => $kudos));
-				echo elgg_view('input/hidden',array('internalname' => 'kudos_giver','value' => $vars['user']->name));
-				echo elgg_view('input/submit', array('value' => elgg_echo('Extend your Kudos') ,'class' => elgg_echo('kudos_button'),'borderbrush'=>elgg_echo('transparent'), 'borderthickness'=>elgg_echo('0')));
+				echo elgg_view('input/hidden', array('internalname' => 
+					'guid', 'value' => $karma_entity_guid));
+				echo elgg_view('input/hidden', array('internalname' => 
+					'loggedin_karma_guid', 'value' => $loggedin_karma_guid));
+				echo elgg_view('input/hidden', array('internalname' => 
+					'max_kudos', 'value' => $max_kudos));
+				echo elgg_view('input/hidden',array('internalname' => 
+					'kudos','value' => $kudos));
+				echo elgg_view('input/hidden', array('internalname' => 
+					'kudos_giver', 'value' => $vars['user']->name));
+				echo elgg_view('input/submit', array('value' => 
+					elgg_echo('Extend your Kudos') , 'class' => elgg_echo
+					('kudos_button'), 'borderbrush'=>elgg_echo('transparent'), 
+					'borderthickness'=>elgg_echo('0')));
 ?>
 			</form>
 <?php
@@ -120,7 +128,8 @@
 	
 <!-- displapy the user's badge  -->
 <div class = "emblem">
-	&nbsp;&nbsp;&nbsp;<img <?php echo $img_class; ?> src="<?php echo elgg_format_url($vars['url']."mod/karma/default_icons/".$badge.".jpg");?>" />
+	&nbsp;&nbsp;&nbsp;<img <?php echo $img_class; ?> src="<?php echo 
+	elgg_format_url($vars['url']."mod/karma/default_icons/".$badge.".jpg");?>" />
 </div>
 <div class = "score">
 	<?php
@@ -152,8 +161,10 @@
 				echo '<br>';
 				echo "<b>Wiki Edits</b>: ".$activity[4];
 				echo '<br>';
-				//display what percentage of maximum score is the current user's score.
-				$perc = round(calculate_percent_of_score($developer_score,$marketing_score),4);
+				/*display what percentage of maximum score is the current 
+				 * user's score.*/
+				$perc = round(calculate_percent_of_score($developer_score,
+					$marketing_score), 4);
 				if($perc != 1) {
 					echo "Your score is ".($perc*100)."% of the Max score.";
 					echo '<br>';
@@ -170,15 +181,20 @@
 						//display only recent 10 or less results.
 						$senders = $entity->kudos_sender;
 						$size = count($senders);
-						$limit = min(10,$size);
+						$limit = min(10, $size);
 						for ($i = 0; $i < $limit; $i++) {
-							echo '<a id = "kudos_senders" href = "'.$vars['url']."pg/profile/".$senders[$size - $i - 1].'">'.$senders[$size - $i - 1].'</a>'." | ";
+							echo '<a id = "kudos_senders" href = "'.$vars['url'].
+								"pg/profile/".$senders[$size - $i - 1].'">'.
+								$senders[$size - $i - 1].'</a>'." | ";
 						}
 						if (($size - 10) > 0 )
 							echo "And ".($size - 10)." more";
 					}
-					else if( !is_array($entity->kudos_sender) && !is_null($entity->kudos_sender))
-					 echo '<a id = "kudos_senders" href = "'.$vars['url']."pg/profile/".$entity->kudos_sender.'">'.$entity->kudos_sender.'</a>';
+					else if( !is_array($entity->kudos_sender) && 
+						!is_null($entity->kudos_sender))
+					 echo '<a id = "kudos_senders" href = "'.$vars['url'].
+						"pg/profile/".$entity->kudos_sender.'">'.$entity->
+						kudos_sender.'</a>';
 				}	
 			echo '</div>';
 		echo '</div>';
