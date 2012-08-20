@@ -59,23 +59,23 @@
 </style>
 
 <?php 
-	//guid of the user to which the widget belongs.
+	//Guid of the user to which the widget belongs.
 	$guid = $vars['entity']->owner_guid;
 	$user_entity = get_entity($guid);
 	
-	//find the time passed since karma was last updated for current user.
+	//Find the time passed since karma was last updated for current user.
 	$last_updated = $user_entity->karma_update_time;
 	$current_time = time();
 	$time_diff_in_hours = round(abs($current_time - $last_updated) / 3600,2);
 	
-	//if time passed since last update is more than one hour, then update on widget view.
+	//If time passed since last update is more than one hour, then update on widget view.
 	if ($time_diff_in_hours > 1 ) {
 		karma_update($guid, '0', '0');
 	}
-	//get karma instance for user.
+	//Get karma instance for user.
 	$entities = get_entities('object', 'karma', $guid);
 	
-	//karma details exists, print them.	
+	//Karma details exists, print them.	
 	$entity = $entities[0];
 	$karma_entity_guid = $entity->guid;
 	$badge = $entity->badge;
@@ -86,10 +86,10 @@
 	$img_class = 'class = emblem';
 	
 ?>
-	<!-- display the kudos button -->
+	<!-- Display the kudos button -->
 	<div id = "kudos">
 <?php 
-		//in a day a user can extended kudos only max_kudos number of times.
+		//In a day a user can extended kudos only max_kudos number of times.
 		$loggedin_userid = get_loggedin_userid();
 		$loggedin_karma_entity = get_entities('object', 'karma', $loggedin_userid);
 		$loggedin_karma_entity = $loggedin_karma_entity[0];
@@ -121,12 +121,13 @@
 			</form>
 <?php
 		}
-		//display rank of the user, based on overall score.
-		echo '<div class = "rank"><i>'."Rank ".'</i><b>'.$entity->rank.'</b></div>';
+		//Display rank of the user, based on overall score.
+		if (!is_null($entity->rank))
+			echo '<div class = "rank"><i>'."Rank ".'</i><b>'.$entity->rank.'</b></div>';
 ?>
 	</div>
 	
-<!-- displapy the user's badge  -->
+<!-- Display the user's badge  -->
 <div class = "emblem">
 	&nbsp;&nbsp;&nbsp;<img <?php echo $img_class; ?> src="<?php echo 
 	elgg_format_url($vars['url']."mod/karma/default_icons/".$badge.".jpg");?>" />
@@ -140,16 +141,16 @@
 </div>
 
 <?php
-	//display score details.
+	//Display score details.
 		echo '<div class = "search_listing">';
 			echo '<div id  = "score_details">';
 				echo '<b style = "color:#690;">'."Score Details".'</b>';
-				//display why a certain badge was awarded to the user.
+				//Display why a certain badge was awarded to the user.
 				echo '<div class = "badge_suggestion">';
 					$suggestion = load_badge_suggestion($badge);
 					echo $suggestion;	
 				echo '</div>';
-				//diplay activity 
+				//Diplay activity 
 				echo '<br>';
 				echo "<b>Bug Fixes</b>: ".$activity[1];
 				echo '<br>';
@@ -161,7 +162,7 @@
 				echo '<br>';
 				echo "<b>Wiki Edits</b>: ".$activity[4];
 				echo '<br>';
-				/*display what percentage of maximum score is the current 
+				/*Display what percentage of maximum score is the current 
 				 * user's score.*/
 				$perc = round(calculate_percent_of_score($developer_score,
 					$marketing_score), 4);
@@ -170,32 +171,36 @@
 					echo '<br>';
 				}
 				echo '<br>';
-				//display kudos
-				if(!is_null($kudos)) {
+				//Display kudos
+				if (!is_null($kudos)) {
 					echo "<b>Kudos: </b>".$kudos;
 					echo '<br>';
-					//display who all extended kudos to the current logged in user.
-					echo "<b>Kudos Given By: </b>";
-					echo '<br>';
-					if (is_array($entity->kudos_sender)) {
-						//display only recent 10 or less results.
-						$senders = $entity->kudos_sender;
-						$size = count($senders);
-						$limit = min(10, $size);
-						for ($i = 0; $i < $limit; $i++) {
-							echo '<a id = "kudos_senders" href = "'.$vars['url'].
-								"pg/profile/".$senders[$size - $i - 1].'">'.
-								$senders[$size - $i - 1].'</a>'." | ";
+					if (!is_null($entity->kudos_sender)) {
+						//Display who all extended kudos to the current logged in user.
+						echo "<b>Kudos Given By: </b>";
+						echo '<br>';
+						if (is_array($entity->kudos_sender)) {
+							//Display only recent 10 or less results.
+							$senders = $entity->kudos_sender;
+							$size = count($senders);
+							$limit = min(10, $size);
+							for ($i = 0; $i < $limit; $i++) {
+								echo '<a id = "kudos_senders" href = "'.$vars['url'].
+									"pg/profile/".$senders[$size - $i - 1].'">'.
+									$senders[$size - $i - 1].'</a>'." | ";
+							}
+							if (($size - 10) > 0 )
+								echo "And ".($size - 10)." more";
 						}
-						if (($size - 10) > 0 )
-							echo "And ".($size - 10)." more";
+						//if there is only a single kudos sender
+						else if( !is_array($entity->kudos_sender) && 
+							!is_null($entity->kudos_sender))
+								echo '<a id = "kudos_senders" href = "'.$vars['url'].
+								"pg/profile/".$entity->kudos_sender.'">'.$entity->
+								kudos_sender.'</a>';
 					}
-					else if( !is_array($entity->kudos_sender) && 
-						!is_null($entity->kudos_sender))
-					 echo '<a id = "kudos_senders" href = "'.$vars['url'].
-						"pg/profile/".$entity->kudos_sender.'">'.$entity->
-						kudos_sender.'</a>';
 				}	
 			echo '</div>';
 		echo '</div>';
+	
 ?>

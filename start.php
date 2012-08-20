@@ -1,20 +1,22 @@
 <?php
 	function karma_init(){
+		//Include elggbatch.php to use batch processing for calculating ranks.
+		require_once(dirname(__FILE__) . "/lib/elggbatch.php");
 		add_widget_type('karma', 'Karma', 'Find your Karma score');
-		//override permissions for the karma context
+		//Override permissions for the karma context
 		register_plugin_hook('permissions_check', 'all', 'karma_permissions_check');
-		//register cron hook to trigger function karma_cron every five minutes. 
+		//Register cron hook to trigger function karma_cron every five minutes. 
 		register_plugin_hook('cron', 'fiveminute', 'karma_cron');
 	}
 	
-	//cron function 
+	//Cron function 
 	function karma_cron($hook, $entity_type, $returnvalue, $params) {
 		global $CONFIG;
 		$context = get_context();
 		set_context('karma_update');	
-		//allow karma_update for read access
+		//Allow karma_update for read access
 		$access = elgg_set_ignore_access(true);
-		//get 5 user entities who have been longest without updating.
+		//Get 5 user entities who have been longest without updating.
 		$entities = elgg_get_entities_from_metadata(array(
 					'types' => 'user',
 					'limit' => '5',
@@ -24,17 +26,17 @@
 					'direction' => 'ASC',
 					'as' => integer) ));
 		
-		//call function to update karma score for latest updated packages.
+		//Call function to update karma score for latest updated packages.
 		build_service_update();
 	
-		//for each user update karma score(this is done every five minutes).
+		//For each user update karma score(this is done every five minutes).
 		foreach ($entities as $entity) {
 			karma_update($entity->guid, '0', '0');
 		}
-		//find user ranks based on overall score.
+		//Find user ranks based on overall score.
 		karma_rank();
 		
-		//set context and read access rights back to what they were originally.
+		//Set context and read access rights back to what they were originally.
 		set_context($context);
 		elgg_set_ignore_access($access);
 		
@@ -42,16 +44,16 @@
 		return $result;
 	}
 	
-	//function to update karma for each user, also on widget view.
+	//Function to update karma for each user, also on widget view.
 	function karma_update($guid, $obs_score , $commit ) {
-		/*get current context and set context to karma_update_for_user 
+		/*Get current context and set context to karma_update_for_user 
 		 * so that karma has write permissions.*/
 		$context = get_context();
 		set_context('karma_update_for_user');	
-		//allow karma_update for read access
+		//Allow karma_update for read access
 		$access = elgg_set_ignore_access(true);
 		
-		/*get the user entity and then fetch username, twitter screen name, 
+		/*Get the user entity and then fetch username, twitter screen name, 
 		 * email id and blog url.*/
 		$user = get_entity($guid);
 		$email = $user->email;
@@ -59,27 +61,27 @@
 		$blog_url = $user->blog;
 		$username = $user->username;
 		
-		//bugzilla score
+		//Bugzilla score
 		$bugzilla = bugzilla_score($email);
 		$bugzilla_score = $bugzilla[0];
 		$num_of_bugs_fixed = $bugzilla[1];
 			
-		//twitter score
+		//Twitter score
 		$twitter = twitter_score($twitter_screen_name, $guid);
 		$twitter_score = $twitter[0];
 		$num_of_tweets = $twitter[1];
 			
-		//planet opensuse score
+		//Planet openSUSE score
 		$planet_opensuse = planet_opensuse_score($blog_url, $guid);
 		$planet_opensuse_score = $planet_opensuse[0];
 		$num_of_posts = $planet_opensuse[1];
 		
-		//openSUSE wiki score
+		//openSUSE Wiki score
 		$wiki = wiki_score($username, $guid);
 		$wiki_score = $wiki[0];
 		$num_of_edits = $wiki[1];	
 			
-		//check if karma object exists for user, if it does then update it.
+		//Check if karma object exists for user, if it does then update it.
 		$entities = get_entities('object', 'karma', $guid);
 		if(isset($entities[0])) {
 			$karma = $entities[0];
@@ -88,9 +90,9 @@
 			$old_marketing_score = $karma->marketing_score;
 			$old_wiki_score = $karma->wiki_score;
 		}
-		//when karma details do not exist before
+		//When karma details do not exist before
 		else {
-			//create an instance of ElggObject class to store karma score for each user. 
+			//Create an instance of ElggObject class to store karma score for each user. 
 			$karma = new ElggObject();
 			
 			$karma->title = $user->name;
@@ -104,7 +106,7 @@
 			$old_wiki_score = 0;
 			$old_activity = array(0,0,0,0,0);
 		}
-		//update marketing and developer score.
+		//Update marketing and developer score.
 		$karma->wiki_score = $old_wiki_score + $wiki_score;
 		$karma->developer_score = array($bugzilla_score, $obs_score + 
 			$old_developer_score[1]);
@@ -120,43 +122,40 @@
 			$karma->developer_score[1] + $karma->marketing_score[0] + 
 			$karma->marketing_score[1] + $wiki_score + $karma->kudos;
 		
-		/*pass developer and marketing score to check if current user 
+		/*Pass developer and marketing score to check if current user 
 		 * score is max score, and return max score.*/
 		$max_score = calculate_max_score($karma->developer_score,
 			$karma->marketing_score);
 		
-		//assign badge to user with the help of user score and max score.
+		//Assign badge to user with the help of user score and max score.
 		$badge = assign_badge($karma->developer_score, $karma->marketing_score,
 			$karma->wiki_score, $max_score);
 		
 		$karma->badge = $badge;
 		$karma->save();
 		
-		//update metadata field to keep track of last updation.
+		//Update metadata field to keep track of last updation.
 		$user->karma_update_time = time();
 		$user->save();
 		
-		//set context and acsess rights back to what they were originally.
+		//Set context and acsess rights back to what they were originally.
 		set_context($context);
 		elgg_set_ignore_access($access);
 	}
 	
-	//calculate score through Bugzilla
+	//Calculate score through Bugzilla
 	function bugzilla_score($email) {
 		$score  = 0;
 		$num_of_bugs_fixed = 0;
 		
-		//call to Bugzilla to return resolved bugs
-		$csv_url = "https://bugzilla.novell.com/buglist.cgi?bug_status=
-			RESOLVED&bug_status=VERIFIED&email1=$email&emailassigned_to1=1
-			&emailinfoprovider1=1&emailtype1=exact&query_format=advanced&
-			title=Bug%20List&ctype=csv";
+		//Call to Bugzilla to return resolved bugs
+		$csv_url = "https://bugzilla.novell.com/buglist.cgi?bug_status=RESOLVED&bug_status=VERIFIED&email1=$email&emailassigned_to1=1&emailinfoprovider1=1&emailtype1=exact&query_format=advanced&title=Bug%20List&ctype=csv";
 		
 		$xmls = file_get_contents($csv_url);
 		$arr = explode("\n", $xmls);
 		array_shift($arr);
 			
-		//now for each bug, check its severity.
+		//Now for each bug, check its severity.
 		foreach ($arr as $line) {
 			$d = explode(',' , $line, 8);
 			$severity = $d[1];
@@ -180,7 +179,7 @@
 			}
 			$num_of_bugs_fixed ++;
 		}
-		/*if the user has not confirmed his email id on bugzilla, 
+		/*If the user has not confirmed his email id on bugzilla, 
 		 * file_get_contents returns a page, not a list of bugs.*/
 		if ($score == 0) {
 			$num_of_bugs_fixed = 0;
@@ -193,15 +192,13 @@
 		return $bugzilla_score;
 	}
 	
-	//calculates score based on user-tweets on twitter.
+	//Calculates score based on user-tweets on twitter.
 	function twitter_score($twitter_screen_name, $guid) {
 		$score = 0;
 		$num_of_tweets = 0;
 		
-		//call to twitter, returns user's last 5 tweets.
-		$json = file_get_contents("https://api.twitter.com/1/statuses/user
-		_timeline.json?include_entities=true&include_rts=true&screen_name=
-		$twitter_screen_name&count=5");
+		//Call to twitter, returns user's last 5 tweets.
+		$json = file_get_contents("https://api.twitter.com/1/statuses/user_timeline.json?include_entities=true&include_rts=true&screen_name=$twitter_screen_name&count=5");
 		
 		$file = json_decode($json, 'true');
 		foreach ($file as $key=>$value) {
@@ -226,7 +223,7 @@
 		return $twitter_score;
 	}
 	
-	//planet opensuse score
+	//Planet openSUSE score
 	function planet_opensuse_score($blog_url, $guid) {
 		$score = 0;
 		$num_of_posts = 0;
@@ -234,7 +231,7 @@
 		$item = $rss->xpath('channel/item');
 		foreach ($rss->xpath('channel/item') as $item) {
 			if (stripos($item->link, $blog_url) !== False) {
-				//checks the time of publishing, should be after the last update.
+				//Checks the time of publishing, should be after the last update.
 				$check = check_date($item->pubDate, $guid);
 				if ($check == true) {
 					$score += 5;
@@ -247,9 +244,9 @@
 		return $planet_opensuse;
 	}
 	
-	//function to update karma score on making commits in Build service.
+	//Function to update karma score on making commits in Build service.
 	function build_service_update() {
-		//call the build service api to get latest updated packages.
+		//Call the build service api to get latest updated packages.
 		$url = "https://api.opensuse.org/statistics/latest_updated?limit=10";
 		$data = curl_request_to_api($url);
 		//Use the DOMDocument class to represent the fetched document in XML.
@@ -262,38 +259,38 @@
 			$commits = 0;
 			$project = $r->getAttribute('project');
 			$package = $r->getAttribute('name');
-			//call the build service api to fetch source files of the package.
+			//Call the build service api to fetch source files of the package.
 			$url = "https://api.opensuse.org/source/".$project."/".$package;
 			$source_files = curl_request_to_api($url);
 			$dom_doc = new DOMDocument;
 			$dom_doc->loadXML($source_files); 
 			$xp = new DOMXPath($dom_doc);
-			//read the list to source files to find the .changes file.
+			//Read the list to source files to find the .changes file.
 			$result_source_files = $xp->query('/directory/entry');
-			//emails of users who are to be rewarded for their commits.
+			//Emails of users who are to be rewarded for their commits.
 			$array_emails = array();
 			foreach ($result_source_files as $result_source_file) {
 				if (strpos ( $result_source_file->getAttribute('name'), ".changes" )) {
 					$name_of_changes_file = $result_source_file->getAttribute('name');
 					
-					//cal the build api to read the changes file.
+					//Call the build api to read the changes file.
 					$url = "https://api.opensuse.org/source/".$project."/".
 						$package."/".$name_of_changes_file;
 					
 					$data = curl_request_to_api($url);
 					
-					//break all file into separate results.
+					//Break all file into separate results.
 					$commit_details = explode("-------------------------
 						------------------------------------------", $data);
 					
 					foreach ($commit_details as  $commit_detail) {
-						/*process changes file to fetch email of users who have made commits 
+						/*Process changes file to fetch email of users who have made commits 
 						 * after the last update. */
 						$changes = process_changes_file($commit_detail);
 						if (!is_null($changes))
 							$arr[] = $changes; //put the returned emails in an array.
 					}
-					/*use array_count_values to return how many times each user has made a commit.
+					/*Use array_count_values to return how many times each user has made a commit.
 					 * (A user can make commits more than one time). results are of the form 
 					 * arr['email_id'] => number of occurences after the last update in the changes file  */
 					$count = array_count_values($arr);
@@ -308,7 +305,7 @@
 		}
 	}
 	
-	//function to make cURL GET requests to the OBS API.
+	//Function to make cURL GET requests to the OBS API.
 	function curl_request_to_api($url) {
 		$headers = array("Authorization: Basic cHJpeWFua2FfbToxMjNhYmNkY29kZXIxMjM=");
 		$ch = curl_init($url); 
@@ -326,7 +323,7 @@
 		return $data;
 	}
 	
-	//function to return the position of nth occurence of needle in the haystack.
+	//Function to return the position of nth occurence of needle in the haystack.
 	function nthstrpos($haystack, $needle, $nth) {
 		$place = -1;
 		for ($i = 0; $i < $nth; $i++) 
@@ -334,7 +331,7 @@
 		return $place;
 	}
 	
-	/*process the changes file to fetch emails of those users who have made commits 
+	/*Process the changes file to fetch emails of those users who have made commits 
 	 * after their respective last update time. */
 	function process_changes_file($commit_detail) {
 		$pos = strpos($commit_detail, "-");
@@ -356,7 +353,7 @@
 			$guid = $user->guid;
 			$check_date = check_date($time, $guid);
 		}
-		//check if time is greater than last update only then return the email.
+		//Check if time is greater than last update only then return the email.
 		if ($check_date == true)
 			return $email;
 		else
@@ -368,7 +365,7 @@
 		$total_score = 0;
 		$total_num_of_edits = 0;
 		
-		//brute-forced from http://i18n.opensuse.org/stats/trunk/index.php
+		//Brute-forced from http://i18n.opensuse.org/stats/trunk/index.php
 		$locales = array('cs','cz','de','el','en','es','fi','fr','hu','it',
 			'ja','nl','pl','pt','ru','sv','tr','vi','zh');
 		
@@ -388,7 +385,7 @@
 			// Extract text value and replace with something else
 			foreach ($tags_updated as $tag) {
 				$tag_value = $tag->nodeValue;
-				// get translation of tag_value
+				// Get translation of tag_value
 				$time = str_replace("T", " ", str_replace("Z", "", $tag_value));
 				$check = check_date($time, $guid);
 				if ($check == true) {
@@ -396,7 +393,7 @@
 					$num_of_edits ++;
 				}
 			}
-			/*subtract on account of an extra update tag outside all entry 
+			/*Subtract on account of an extra update tag outside all entry 
 			 * tags, which is the feed's 'updated' tag.*/
 			if ($num_of_edits > 0 && $score > 0) {
 				$num_of_edits -= 1;
@@ -405,17 +402,17 @@
 			
 			$total_score += $score;
 			$total_num_of_edits += $num_of_edits;
-		} // end locales loop
+		} // End locales loop
 		
-		$wiki_score = array($score, $total_num_of_edits);
+		$wiki_score = array($total_score, $total_num_of_edits);
 		return $wiki_score;
 	}
 	
-	//finding maximum developer and marketing score.
+	//Finding maximum developer and marketing score.
 	function calculate_max_score($developer_score, $marketing_score) {
 		$marketing_score = $marketing_score[0] + $marketing_score[1];
 		$developer_score = $developer_score[0] + $developer_score[1];
-		//get maximum karma score object.
+		//Get maximum karma score object.
 		$entities = elgg_get_entities(array('type'=>'object', 'subtype'=>'max_karma'));
 		
 		if (!isset($entities[0])) {
@@ -425,7 +422,7 @@
 			$max_karma->max_developer = $developer_score;
 			$max_karma->max_marketing = $marketing_score;
 		}
-		/*if maximum karma score object exists then find maximum of the score passed as 
+		/*If maximum karma score object exists then find maximum of the score passed as 
 		 * argument and previously existing maximum score.*/
 		else {
 			$max_karma = $entities[0];
@@ -439,7 +436,7 @@
 		return array($max_karma->max_developer, $max_karma->max_marketing); 
 	}
 	
-	//checks if time of publishing is greater than last update.
+	//Checks if time of publishing is greater than last update.
 	function check_date($date, $guid) {
 		$timestamp = strtotime($date);
 		$entity = get_entity($guid);
@@ -455,7 +452,7 @@
 		}	
 	}
 	
-	//assigns badge given marketing and developer score
+	//Assigns badge given marketing and developer score
 	function assign_badge($developer, $marketing, $wiki_score, $max_score) {
 		$bugzilla_score = $developer[0];
 		$build_service_score = $developer[1];
@@ -516,34 +513,21 @@
 		return $badge;
 	}	
 	
-	//function to calculate user ranks based on total score.
+	//Function to calculate user ranks based on total score.
 	function karma_rank() {
-		//get all karma entities.
-		$entities = elgg_get_entities(array('types' => 'object', 'subtypes' 
-			=> 'karma', 'limit' => FALSE ));
-		
-		/*incase for certain users total score has not been calculated, 
-		 * do it now to avoid errors.*/
-		foreach ($entities as $entity) {
-			$entity->total_score = $entity->developer_score[0] + 
-				$entity->developer_score[1] + $entity->marketing_score[0] 
-				+ $entity->marketing_score[1] + $entity->wiki_score + $entity->kudos;
-			
-			$entity->save();
-		}	
-				
-		//fetch all karma entities in descending order of their karma total score.		
-		$entities = elgg_get_entities_from_metadata(array('types' => 'object', 
-			'subtypes' => 'karma', 'limit' => FALSE, 'metadata_names' => 'total_score',
+		//Use a callback function to assign ranks to 5 karma entities each time.
+		$callback = function($result, $getter, $options) 
+		{	
+			static $rank = 0;
+			$rank++;
+			$result->rank = $rank;
+			$result->save();
+			return true;
+		};
+		//process karma entities in batches of 5 each.
+		$batch = new ElggBatch('elgg_get_entities_from_metadata', array('types'=>'object','subtypes'=>'karma','limit' =>'false', 'metadata_names' => 'total_score',
 			'order_by_metadata' => array('name' => 'total_score', 'direction' => 'DESC', 
-			'as' => integer) ));
-		//starting from the karma entity at the top assign rank '1' and so on.
-		$rank = 1;
-		foreach ($entities as $entity) {
-			$entity->rank =$rank;
-			$entity->save();
-			$rank += 1; 
-		}
+			'as' => integer) ),$callback,5,true);
 	}
 	
 	//Overrides default permissions for the karma context
@@ -555,7 +539,7 @@
 			return null;
 	} 
 	
-	/* calcalute how much percentage of the maximum score is the current
+	/* Calculate what percentage of the maximum score is the current
 	 *  user score so that user has idea of how much he needs to increase 
 	 * his score to be the maximum scorer. */
 	function calculate_percent_of_score($developer_score, $marketing_score) {
@@ -570,7 +554,7 @@
 		$max_developer = $max_score[0];
 		$max_marketing = $max_score[1];
 		
-		//calculate percentage for whichever score is higher.
+		//Calculate percentage for whichever score is higher.
 		if ($developer_score > $marketing_score) {
 			$perc = $developer_score/$max_developer;
 		}
@@ -584,7 +568,7 @@
 		elgg_set_ignore_access($access);
 	}
 	
-	/*function that returns a message, which explains why a certain badge 
+	/*Function that returns a message, which explains why a certain badge 
 	 * was awarded to the current user.*/
 	function load_badge_suggestion($badge) {
 			if ($badge == "Twitteratti")
@@ -649,7 +633,7 @@
 	}
 	
 	
-	//function that provides karma details on being called by the api.
+	//Function that provides karma details on being called by the api.
 	function karma_details($username) {
 		$user = get_user_by_username($username);
 		
@@ -675,12 +659,12 @@
 			return "incorrect username";
 	}
 	
-	//function to expose the karma_details method to the Connect API, requires api authentication.
+	//Function to expose the karma_details method to the Connect API, requires api authentication.
 	expose_function("karma.details", "karma_details", array("username" => 
 		array('type' => 'string')), 'A method which fetches karma details 
 		of a user', 'GET', true, false);
 	
-	 //register to action for allowing giving 'KUDOS to other connect users'.
+	 //Register to action for allowing giving 'KUDOS to other connect users'.
 	register_action("karma/kudos", false, $CONFIG->pluginspath . "karma/actions/kudos.php");
 	//Initialize plugin.
 	register_elgg_event_handler('init', 'system', 'karma_init'); 
